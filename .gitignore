@@ -1,0 +1,26 @@
+# Dart / Flutter build artifacts
+.dart_tool/
+.packages
+.flutter-plugins-dependencies
+build/
+pubspec.lock
+
+# Generated platform folders — recreate with `flutter create .`
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local tooling
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db

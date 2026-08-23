@@ -18,6 +18,30 @@ definitions:
       rm -f test/widget_test.dart
       flutter pub get
 
+      # --- patches to generated iOS files -------------------------------
+      # ios/ is recreated every build, so these cannot live in git.
+      if [ -f ios/Runner.xcodeproj/project.pbxproj ]; then
+        # ITMS-90068: Flutter templates iOS 13.0, but Apple requires a
+        # MinimumOSVersion of 15.0+ from Spring 2027. MinimumOSVersion is
+        # derived from this setting; AppFrameworkInfo.plist no longer holds it.
+        # Written via a temp file because BSD sed (macOS) and GNU sed disagree
+        # about -i.
+        PBX=ios/Runner.xcodeproj/project.pbxproj
+        sed 's/IPHONEOS_DEPLOYMENT_TARGET = 13\.0;/IPHONEOS_DEPLOYMENT_TARGET = 15.0;/g' \
+          "$PBX" > "$PBX.tmp" && mv "$PBX.tmp" "$PBX"
+        echo "deployment targets now:"
+        grep -o "IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;" "$PBX" | sort | uniq -c
+
+        # Answer the export-compliance question once, in the binary, instead of
+        # by hand in App Store Connect after every upload. This app is offline
+        # and uses no encryption.
+        /usr/libexec/PlistBuddy -c \
+          "Add :ITSAppUsesNonExemptEncryption bool false" ios/Runner/Info.plist \
+          2>/dev/null || \
+        /usr/libexec/PlistBuddy -c \
+          "Set :ITSAppUsesNonExemptEncryption false" ios/Runner/Info.plist
+      fi
+
   test: &test
     name: Analyze and test
     script: |

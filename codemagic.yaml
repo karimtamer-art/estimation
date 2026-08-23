@@ -44,9 +44,9 @@ workflows:
         BUNDLE_ID: "com.calculator.estimation"
         ORG_ID: "com.calculator"
         PLATFORMS: "ios"
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: "com.calculator.estimation"
+      # No `ios_signing:` block on purpose. That is Codemagic's automatic
+      # signing, which only *looks up* profiles and fails with "No matching
+      # profiles found" when none exists yet. The script below creates them.
 
     scripts:
       - *regenerate
@@ -55,6 +55,8 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
+          # --create makes the distribution certificate and provisioning
+          # profile if the account does not have them yet.
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE --create
           keychain add-certificates

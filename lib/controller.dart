@@ -8,7 +8,7 @@ import 'rules.dart';
 import 'scoring.dart';
 import 'strings.dart';
 
-enum Screen { setup, bid, tricks, result, done, settings }
+enum Screen { home, setup, bid, tricks, result, done, settings }
 
 const _kStoreKey = 'estimation_state_v1';
 
@@ -16,8 +16,8 @@ class GameController extends ChangeNotifier {
   Rules rules = Rules.defaults();
   bool arabic = false;
 
-  Screen screen = Screen.setup;
-  Screen _previous = Screen.setup;
+  Screen screen = Screen.home;
+  Screen _previous = Screen.home;
 
   GameMode mode = GameMode.full;
   List<String> players = ['', '', '', ''];
@@ -104,6 +104,54 @@ class GameController extends ChangeNotifier {
         playerCount,
         (i) => rounds.fold<int>(0, (a, r) => a + (i < r.scores.length ? r.scores[i] : 0)),
       );
+
+  /// Seat wearing the crown: the outright highest total. Null until a round has
+  /// been scored, and null on a tie — nobody is king while it is shared.
+  int? get leaderIndex => _extremeIndex(highest: true);
+
+  /// Seat wearing the koz: the outright lowest total. Same tie rule.
+  int? get laggardIndex => _extremeIndex(highest: false);
+
+  int? _extremeIndex({required bool highest}) {
+    if (playedCount == 0) return null;
+    final t = totals;
+    var best = t[0];
+    for (final v in t) {
+      if (highest ? v > best : v < best) best = v;
+    }
+    final holders = <int>[];
+    for (var i = 0; i < t.length; i++) {
+      if (t[i] == best) holders.add(i);
+    }
+    // A crown shared by everyone marks nothing useful.
+    if (holders.length != 1) return null;
+    return holders.first;
+  }
+
+  void goHome() {
+    screen = Screen.home;
+    notifyListeners();
+    _save();
+  }
+
+  /// Home -> player and length setup.
+  void toSetup() {
+    screen = Screen.setup;
+    notifyListeners();
+    _save();
+  }
+
+  /// True once a game is under way, so Home can offer to resume it.
+  bool get hasGameInProgress =>
+      rounds.isNotEmpty || screen == Screen.bid || screen == Screen.tricks;
+
+  /// Back into a game already in progress, at whichever half of the round was
+  /// left unfinished.
+  void resumeGame() {
+    screen = bidsComplete ? Screen.tricks : Screen.bid;
+    notifyListeners();
+    _save();
+  }
 
   // ----------------------------------------------------------------- actions
 

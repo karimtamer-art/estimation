@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'controller.dart';
 import 'models.dart';
@@ -7,6 +8,12 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Landscape only: four seats side by side need the width, and the scoresheet
+  // reads like the paper one it replaces.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
   final controller = GameController();
   await controller.load();
   runApp(EstimationApp(controller: controller));
@@ -46,11 +53,17 @@ class HomeShell extends StatelessWidget {
     final showHeader =
         c.screen != Screen.setup && c.screen != Screen.settings;
 
+    // Home carries its own language button and needs the full frame.
+    if (c.screen == Screen.home) {
+      return Scaffold(body: SafeArea(child: HomeScreen(c: c)));
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
+            // Landscape: let the seats use the real width of the device.
+            constraints: const BoxConstraints(maxWidth: 1000),
             child: Column(
               children: [
                 Padding(
@@ -82,6 +95,8 @@ class HomeShell extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.onGold)),
                         ),
+                      _IconBtn(label: '\u2302', onTap: c.goHome),
+                      const SizedBox(width: 6),
                       _IconBtn(
                         label: c.arabic ? 'EN' : '\u0639',
                         onTap: c.toggleLanguage,
@@ -107,6 +122,8 @@ class HomeShell extends StatelessWidget {
 
   Widget _body() {
     switch (c.screen) {
+      case Screen.home:
+        return HomeScreen(c: c);
       case Screen.setup:
         return SetupScreen(c: c);
       case Screen.bid:

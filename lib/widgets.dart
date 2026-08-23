@@ -25,33 +25,21 @@ class SeatColumn extends StatelessWidget {
     final value = isBid ? c.working.bids[index] : c.working.tricks[index];
     final unset = value == null;
 
-    final tags = <String>[];
-    final goldTag = <bool>[];
-    if (isBid) {
-      if (isDash) {
-        tags.add(s.dash);
-        goldTag.add(true);
-      } else if (d.callerOrWith[index] && d.top != null) {
-        final many = d.callerOrWith.where((x) => x).length > 1;
-        tags.add(many ? s.with_ : s.caller);
-        goldTag.add(true);
-      } else {
-        tags.add('');
-        goldTag.add(false);
-      }
-      if (index == d.riskIndex && d.riskLevel > 0) {
-        tags.add('${s.risk} \u00d7${d.riskLevel}');
-        goldTag.add(true);
-      } else {
-        tags.add('');
-        goldTag.add(false);
-      }
-    } else {
-      tags.add(c.working.dash[index]
-          ? s.dash
-          : '${s.estimate} ${c.working.bids[index] ?? '-'}');
-      goldTag.add(false);
+    // The prominent badge: Caller / With / Dash. Derived, never chosen.
+    String? badge;
+    if (isDash) {
+      badge = s.dash;
+    } else if (isBid && d.callerOrWith[index] && d.top != null) {
+      badge = d.callerOrWith.where((x) => x).length > 1 ? s.with_ : s.caller;
     }
+
+    final riskTag = (isBid && index == d.riskIndex && d.riskLevel > 0)
+        ? '${s.risk} \u00d7${d.riskLevel}'
+        : null;
+
+    // Crown to the outright leader, koz to the outright last place.
+    final crown = c.leaderIndex == index;
+    final koz = c.laggardIndex == index;
 
     final dashCount = c.working.dash.where((x) => x).length;
     final canDash = isDash || dashCount < c.rules.maxDash;
@@ -65,12 +53,20 @@ class SeatColumn extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Crown / koz row — fixed height so seats stay aligned when empty.
+          SizedBox(
+            height: 20,
+            child: Text(
+              crown ? '👑' : (koz ? '🤡' : ''),
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
           Text(
             c.players[index],
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
           const SizedBox(height: 6),
           _StepButton(
@@ -88,7 +84,7 @@ class SeatColumn extends StatelessWidget {
               child: Text(
                 isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
                 style: numberStyle(
-                  size: 30,
+                  size: 52,
                   color: (unset || isDash) ? AppColors.faint : AppColors.gold,
                 ),
               ),
@@ -99,21 +95,70 @@ class SeatColumn extends StatelessWidget {
             enabled: !isDash,
             onTap: () => c.step(index, -1),
           ),
-          const SizedBox(height: 5),
-          for (var i = 0; i < tags.length; i++)
-            SizedBox(
-              height: 12,
+          const SizedBox(height: 7),
+
+          // On the tricks screen, what this player actually called — big
+          // enough to read across the table without leaning in.
+          if (!isBid)
+            Container(
+              margin: const EdgeInsets.only(bottom: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.raise,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(color: AppColors.line),
+              ),
               child: Text(
-                tags[i],
+                c.working.dash[index]
+                    ? s.dash
+                    : '${s.called} ${c.working.bids[index] ?? '-'}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: labelStyle(
-                  size: 8,
-                  color: goldTag[i] ? AppColors.gold : AppColors.dim,
+                style: const TextStyle(
+                  fontFamily: kMono,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
                 ),
               ),
             ),
+
+          // The Caller / With / Dash badge.
+          SizedBox(
+            height: 24,
+            child: badge == null
+                ? null
+                : Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Text(
+                      '★ ${badge.toUpperCase()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.6,
+                        color: AppColors.onGold,
+                      ),
+                    ),
+                  ),
+          ),
+
+          SizedBox(
+            height: 14,
+            child: Text(
+              riskTag ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: labelStyle(size: 10, color: AppColors.gold),
+            ),
+          ),
           if (isBid) ...[
             const SizedBox(height: 5),
             _DashButton(

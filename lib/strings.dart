@@ -70,6 +70,15 @@ class Str {
   String get multiplier => _p('Multiplier', 'المضاعف');
   String get dashCall => _p('Dash call', 'داش كول');
 
+  // Home
+  String get tagline =>
+      _p('Pocket / Egyptian scoresheet', 'ورقة حساب مصرية');
+  String get newGameBtn => _p('New game', 'لعبة جديدة');
+  String get resume => _p('Resume game', 'أكمل اللعبة');
+  String get called => _p('called', 'قدّر');
+  String get king => _p('King', 'الملك');
+  String get koz => _p('Koz', 'كوز');
+
   // Settings groups
   String get grpScoring => _p('Scoring', 'الحساب');
   String get grpConfirm => _p('Confirm against the app', 'تأكّد من التطبيق');

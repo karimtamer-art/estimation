@@ -72,6 +72,116 @@ class Banner_ extends StatelessWidget {
   }
 }
 
+// --------------------------------------------------------------------- home
+
+/// Landing screen. Landscape: title on the left, actions stacked on the right,
+/// with a small language toggle in the top corner.
+class HomeScreen extends StatelessWidget {
+  final GameController c;
+  const HomeScreen({super.key, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 20),
+      child: Column(
+        children: [
+          // Small upper language button.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _MiniBtn(
+                label: c.arabic ? 'EN' : 'ع',
+                onTap: c.toggleLanguage,
+              ),
+            ],
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Wordmark
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.appName,
+                        style: const TextStyle(
+                          fontSize: 52,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -2,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(width: 60, height: 3, color: AppColors.gold),
+                      const SizedBox(height: 12),
+                      Text(s.tagline, style: labelStyle(size: 11)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Actions
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      PrimaryButton(
+                        c.hasGameInProgress ? s.resume : s.start,
+                        onTap: c.hasGameInProgress ? c.resumeGame : c.toSetup,
+                      ),
+                      const SizedBox(height: 10),
+                      if (c.hasGameInProgress) ...[
+                        PrimaryButton(s.newGameBtn,
+                            secondary: true, onTap: c.toSetup),
+                        const SizedBox(height: 10),
+                      ],
+                      PrimaryButton(s.settings,
+                          secondary: true, onTap: c.openSettings),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _MiniBtn({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: SizedBox(
+          width: 38,
+          height: 30,
+          child: Center(
+            child: Text(label,
+                style: const TextStyle(
+                    fontFamily: kMono, fontSize: 12, color: AppColors.dim)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // -------------------------------------------------------------------- setup
 
 class SetupScreen extends StatelessWidget {
@@ -170,58 +280,73 @@ class EntryScreen extends StatelessWidget {
     final complete = isBid ? c.bidsComplete : c.tricksComplete;
     final allEqual = isBid && c.allEqualEstimates;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 32),
-      children: [
-        if (c.editingIndex != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text('${s.editingRound} ${c.editingIndex! + 1}',
-                style: labelStyle(color: AppColors.gold)),
+    // Landscape: seats take the width on the left, controls sit in a fixed
+    // side panel so the primary action is always on screen without scrolling.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 12),
+              children: [
+                if (c.editingIndex != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text('${s.editingRound} ${c.editingIndex! + 1}',
+                        style: labelStyle(color: AppColors.gold)),
+                  ),
+                Text(isBid ? s.estimate : s.tricksWon, style: labelStyle()),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < c.playerCount; i++) ...[
+                      Expanded(
+                          child: SeatColumn(c: c, index: i, isBid: isBid)),
+                      if (i < c.playerCount - 1) const SizedBox(width: 6),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                StatBar(c: c, isBid: isBid),
+                if (err != null) Banner_(err, warn: true),
+                Scoreboard(c: c),
+              ],
+            ),
           ),
-        Text(isBid ? s.estimate : s.tricksWon, style: labelStyle()),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < c.playerCount; i++) ...[
-              Expanded(child: SeatColumn(c: c, index: i, isBid: isBid)),
-              if (i < c.playerCount - 1) const SizedBox(width: 6),
-            ],
-          ],
-        ),
-        const SizedBox(height: 14),
-        StatBar(c: c, isBid: isBid),
-        if (isBid && c.lockedTrump == null) ...[
-          const SizedBox(height: 14),
-          Text(s.trump, style: labelStyle()),
-          const SizedBox(height: 8),
-          TrumpRow(c: c),
+          const SizedBox(width: 14),
+          SizedBox(
+            width: 210,
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 12),
+              children: [
+                if (isBid && c.lockedTrump == null) ...[
+                  Text(s.trump, style: labelStyle()),
+                  const SizedBox(height: 8),
+                  TrumpRow(c: c),
+                  const SizedBox(height: 14),
+                ],
+                allEqual
+                    ? PrimaryButton(s.rebid, onTap: c.doubleAndRebid)
+                    : PrimaryButton(
+                        isBid ? s.enterTricks : s.scoreRound,
+                        onTap: (complete && err == null)
+                            ? (isBid ? c.toTricks : c.commit)
+                            : null,
+                      ),
+                const SizedBox(height: 8),
+                PrimaryButton(
+                  isBid ? s.allPassed : s.back,
+                  secondary: true,
+                  onTap: isBid ? c.skipRound : c.backToBids,
+                ),
+              ],
+            ),
+          ),
         ],
-        if (err != null) Banner_(err, warn: true),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: allEqual
-                  ? PrimaryButton(s.rebid, onTap: c.doubleAndRebid)
-                  : PrimaryButton(
-                      isBid ? s.enterTricks : s.scoreRound,
-                      onTap: (complete && err == null)
-                          ? (isBid ? c.toTricks : c.commit)
-                          : null,
-                    ),
-            ),
-            const SizedBox(width: 8),
-            PrimaryButton(
-              isBid ? s.allPassed : s.back,
-              secondary: true,
-              onTap: isBid ? c.skipRound : c.backToBids,
-            ),
-          ],
-        ),
-        Scoreboard(c: c),
-      ],
+      ),
     );
   }
 }

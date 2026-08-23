@@ -62,6 +62,16 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
+          # Diagnostics: if the build later says "no valid code signing
+          # certificates", this is where to look — an empty list here means
+          # --create silently produced no certificate (usually an API key
+          # without Admin rights, which cannot create certificates).
+          echo "=== certificates in keychain ==="
+          keychain list-certificates || true
+          echo "=== provisioning profiles ==="
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || \
+            echo "  none present"
+
       - name: Build signed IPA
         script: |
           # App Store Connect rejects a build number it has already seen, so

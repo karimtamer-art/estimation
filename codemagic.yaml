@@ -12,6 +12,10 @@ definitions:
     script: |
       # Not in git — see the note at the top of this file.
       flutter create . --project-name estimation --org "$ORG_ID" --platforms "$PLATFORMS"
+      # `flutter create` also re-adds its counter template test, which refers to
+      # a MyApp class this app does not have. Left in place it fails analyze
+      # and test on every clean checkout.
+      rm -f test/widget_test.dart
       flutter pub get
 
   test: &test

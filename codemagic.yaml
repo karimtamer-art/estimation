@@ -72,9 +72,11 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        # Internal testers get it with no Beta App Review wait.
-        beta_groups:
-          - Internal Testers
+        # No beta_groups here on purpose: naming a group that does not already
+        # exist in TestFlight fails the publish step. Create the group in
+        # TestFlight first, then add it back to auto-distribute:
+        #   beta_groups:
+        #     - Internal Testers
 
       email:
         recipients:

@@ -78,13 +78,19 @@ class SeatColumn extends StatelessWidget {
             enabled: !isDash,
             onTap: () => c.step(index, 1),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
-              style: numberStyle(
-                size: 30,
-                color: (unset || isDash) ? AppColors.faint : AppColors.gold,
+          _NumberTarget(
+            enabled: !isDash,
+            max: c.rules.tricks,
+            selected: value,
+            onPicked: (n) => c.setValue(index, n),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
+                style: numberStyle(
+                  size: 30,
+                  color: (unset || isDash) ? AppColors.faint : AppColors.gold,
+                ),
               ),
             ),
           ),
@@ -118,6 +124,122 @@ class SeatColumn extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Tapping the big number opens a compact 0..[max] pad anchored to it,
+/// so a seven is one tap instead of seven.
+class _NumberTarget extends StatelessWidget {
+  final Widget child;
+  final bool enabled;
+  final int max;
+  final int? selected;
+  final ValueChanged<int> onPicked;
+
+  const _NumberTarget({
+    required this.child,
+    required this.enabled,
+    required this.max,
+    required this.selected,
+    required this.onPicked,
+  });
+
+  Future<void> _open(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+
+    final anchor = Rect.fromPoints(
+      box.localToGlobal(Offset.zero, ancestor: overlay),
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+    );
+
+    final picked = await showMenu<int>(
+      context: context,
+      color: AppColors.raise,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.line),
+      ),
+      // Anchor to the tapped number; showMenu clamps to the screen edges.
+      position: RelativeRect.fromRect(anchor, Offset.zero & overlay.size),
+      items: [
+        PopupMenuItem<int>(
+          enabled: false,
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: SizedBox(
+              // Five 30px cells + gaps — three tidy rows for 0..13.
+              width: 5 * 30 + 4 * 5,
+              child: Wrap(
+                spacing: 5,
+                runSpacing: 5,
+                children: [
+                  for (var n = 0; n <= max; n++)
+                    _PadCell(
+                      value: n,
+                      selected: n == selected,
+                      onTap: () => Navigator.pop(context, n),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (picked != null) onPicked(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _open(context),
+      child: child,
+    );
+  }
+}
+
+class _PadCell extends StatelessWidget {
+  final int value;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PadCell({
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.gold : AppColors.surface,
+      borderRadius: BorderRadius.circular(7),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(7),
+        onTap: onTap,
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: Center(
+            child: Text(
+              '$value',
+              style: numberStyle(
+                size: 15,
+                color: selected ? AppColors.onGold : AppColors.text,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

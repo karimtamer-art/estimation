@@ -1,0 +1,128 @@
+# Codemagic CI for the Estimation scorekeeper.
+#
+# NOTE: this repo does not version the generated platform folders (see
+# .gitignore). A fresh clone has no ios/, android/ or web/ — every workflow
+# must run `flutter create .` before building or it fails immediately.
+
+definitions:
+  flutter_version: &flutter_version 3.44.8
+
+  regenerate: &regenerate
+    name: Regenerate platform folders
+    script: |
+      # Not in git — see the note at the top of this file.
+      flutter create . --project-name estimation --org "$ORG_ID" --platforms "$PLATFORMS"
+      flutter pub get
+
+  test: &test
+    name: Analyze and test
+    script: |
+      flutter analyze --no-fatal-infos
+      flutter test
+
+workflows:
+  # ---------------------------------------------------------------- iOS
+  ios-testflight:
+    name: iOS · TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    integrations:
+      # Codemagic UI → Teams → Integrations → Apple Developer Portal.
+      # The name here must match the key you added there exactly.
+      app_store_connect: AppStoreConnect
+
+    environment:
+      flutter: *flutter_version
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.karimtamer.estimation"
+        ORG_ID: "com.karimtamer"
+        PLATFORMS: "ios"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: "com.karimtamer.estimation"
+
+    scripts:
+      - *regenerate
+      - *test
+
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build signed IPA
+        script: |
+          # App Store Connect rejects a build number it has already seen, so
+          # never ship the +1 hard-coded in pubspec.yaml.
+          flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # Internal testers get it with no Beta App Review wait.
+        beta_groups:
+          - Internal Testers
+
+      email:
+        recipients:
+          - karimtamer237@gmail.com
+        notify:
+          success: true
+          failure: true
+
+  # ------------------------------------------------------------ Android
+  android:
+    name: Android · APK
+    instance_type: linux_x2
+    max_build_duration: 30
+
+    environment:
+      flutter: *flutter_version
+      vars:
+        ORG_ID: "com.karimtamer"
+        PLATFORMS: "android"
+
+    scripts:
+      - *regenerate
+      - *test
+      - name: Build APK
+        script: |
+          flutter build apk --release --build-number="$BUILD_NUMBER"
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+
+  # ---------------------------------------------------------------- Web
+  web:
+    name: Web
+    instance_type: linux_x2
+    max_build_duration: 20
+
+    environment:
+      flutter: *flutter_version
+      vars:
+        ORG_ID: "com.karimtamer"
+        PLATFORMS: "web"
+
+    scripts:
+      - *regenerate
+      - *test
+      - name: Build web
+        script: |
+          flutter build web --release
+
+    artifacts:
+      - build/web/**

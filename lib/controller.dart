@@ -174,6 +174,23 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// Set a player's number outright, as picked from the number pad.
+  /// Same bookkeeping as [step] — dash clears and the player moves to the
+  /// back of the estimate order, since they just settled.
+  void setValue(int player, int value) {
+    final isBid = screen == Screen.bid;
+    final list = isBid ? working.bids : working.tricks;
+    list[player] = value.clamp(0, rules.tricks);
+
+    if (isBid) {
+      working.dash[player] = false;
+      working.order.remove(player);
+      working.order.add(player);
+    }
+    notifyListeners();
+    _save();
+  }
+
   void toggleDash(int player) {
     final on = !working.dash[player];
     if (on && working.dash.where((d) => d).length >= rules.maxDash) return;

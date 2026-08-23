@@ -80,14 +80,15 @@ void main() {
   });
 
   test('nobody making their bid zeroes the round', () {
-    final r = build(bids: [5, 4, 3, 2], tricks: [4, 5, 2, 2]);
+    // Every player is off their estimate and the tricks still total 13.
+    final r = build(bids: [5, 4, 3, 2], tricks: [6, 3, 4, 0]);
     final out = scoreRound(r, rules, s);
     expect(out.allMissed, isTrue);
     expect(out.scores.every((x) => x == 0), isTrue);
   });
 
   test('all-miss ladder doubles then triples the following rounds', () {
-    final miss = () => build(bids: [5, 4, 3, 2], tricks: [4, 5, 2, 2]);
+    Round miss() => build(bids: [5, 4, 3, 2], tricks: [6, 3, 4, 0]);
     final rounds = [miss(), miss(), build(bids: [5, 4, 3, 2], tricks: [5, 4, 3, 1])];
     final chain = recomputeAll(rounds, rules, 4, s);
     expect(rounds[0].mult, 1);

@@ -37,12 +37,12 @@ workflows:
       xcode: latest
       cocoapods: default
       vars:
-        BUNDLE_ID: "com.karimtamer.estimation"
-        ORG_ID: "com.karimtamer"
+        BUNDLE_ID: "com.calculator.estimation"
+        ORG_ID: "com.calculator"
         PLATFORMS: "ios"
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: "com.karimtamer.estimation"
+        bundle_identifier: "com.calculator.estimation"
 
     scripts:
       - *regenerate
@@ -92,7 +92,7 @@ workflows:
     environment:
       flutter: *flutter_version
       vars:
-        ORG_ID: "com.karimtamer"
+        ORG_ID: "com.calculator"
         PLATFORMS: "android"
 
     scripts:
@@ -114,7 +114,7 @@ workflows:
     environment:
       flutter: *flutter_version
       vars:
-        ORG_ID: "com.karimtamer"
+        ORG_ID: "com.calculator"
         PLATFORMS: "web"
 
     scripts:

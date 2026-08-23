@@ -21,6 +21,14 @@ web/
 # Local tooling
 .claude/settings.local.json
 
+# Secrets — never commit these
+# .p8 = App Store Connect API private key (Apple allows ONE download, ever)
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.pem
+
 # OS
 .DS_Store
 Thumbs.db

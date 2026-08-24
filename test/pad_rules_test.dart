@@ -81,4 +81,40 @@ void main() {
       expect(offered(c, 3), [1]);
     });
   });
+
+  group('starting the round', () {
+    test('it will not start until a seat is pressed as Caller', () {
+      final c = posed(screen: Screen.bid, bids: [5, 4, 3, 2]);
+      expect(c.validationError, 'Press who called.');
+    });
+
+    test('it will not start until a trump is picked', () {
+      final c = posed(screen: Screen.bid, bids: [5, 4, 3, 2], caller: 0);
+      expect(c.validationError, 'Pick the trump.');
+      c.working.trump = Suit.hearts;
+      expect(c.validationError, isNull);
+    });
+
+    test('a color round brings its own trump, so only the Caller is asked',
+        () {
+      final c = posed(screen: Screen.bid, bids: [5, 4, 3, 2], caller: 0)
+        ..mode = GameMode.mini
+        ..rounds = List.generate(5, (_) => Round.empty(4));
+      // Mini is five normal rounds, so the sixth is the first color round.
+      expect(c.isColorRound, isTrue);
+      expect(c.validationError, isNull);
+    });
+  });
+
+  test('Got them is refused when the call would pass thirteen', () {
+    // Seats 0-2 have taken 12 between them and seat 3 called 4: it cannot
+    // have made it, so the button that fills in 4 is not offered.
+    final c = posed(
+      screen: Screen.tricks,
+      bids: [5, 4, 3, 4],
+      tricks: [5, 4, 3, null],
+    );
+    expect(c.canPick(3, 4), isFalse);
+    expect(c.canPick(3, 1), isTrue);
+  });
 }

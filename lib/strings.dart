@@ -55,6 +55,8 @@ class Str {
   String get tapToEdit => _p('Tap a round to edit it', 'اضغط جولة لتعديلها');
   String get gameOver => _p('Game over', 'انتهت اللعبة');
   String get winsWith => _p('wins with', 'يفوز بـ');
+  String get losesWith => _p('loses with', 'يخسر بـ');
+  String get tiedLast => _p('tied last at', 'آخر الترتيب عند');
   String get tieAt => _p('tie at', 'تعادل عند');
   String get points => _p('points', 'نقطة');
   String get editingRound => _p('Editing round', 'تعديل جولة');
@@ -64,6 +66,12 @@ class Str {
           'المجموع ١٣ بالضبط — لازم أحد يغيّر.');
   String get errTricksSum =>
       _p('Tricks must total 13.', 'مجموع اللمات لازم ١٣.');
+  /// One press for the seat that took exactly what it called.
+  String get gotThem => _p('Got them', 'لمّها');
+
+  String get errNoCaller =>
+      _p('Press who called.', 'اضغط مين اللي كول.');
+  String get errNoTrump => _p('Pick the trump.', 'اختار الحكم.');
   String get errCallerNotTop => _p(
       'The Caller must hold the highest estimate.',
       'الكولر لازم يكون صاحب أعلى تقدير.');

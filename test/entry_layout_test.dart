@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
+import 'package:estimation/models.dart';
 import 'package:estimation/theme.dart';
 
 /// A phone held sideways, which is the only way this app is used. An overflow
@@ -59,10 +60,18 @@ void main() {
     expect(c.working.caller, isNull);
   });
 
-  testWidgets('counting tricks keeps its steppers', (t) async {
-    await pumpEntry(t, Screen.tricks);
-    expect(find.text('+'), findsNWidgets(4));
-    expect(find.text('−'), findsNWidgets(4));
+  testWidgets('counting tricks: no steppers, and Got them fills the call',
+      (t) async {
+    final c = await pumpEntry(t, Screen.tricks);
+
+    expect(find.text('+'), findsNothing);
+    expect(find.text('−'), findsNothing);
+    expect(find.text('Got them'), findsNWidgets(4));
+
+    // Seat 0 called 5, so one press is five.
+    await t.tap(find.text('Got them').first);
+    await t.pumpAndSettle();
+    expect(c.working.tricks[0], 5);
   });
   testWidgets('the home wordmark fits, both languages', (t) async {
     SharedPreferences.setMockInitialValues({});
@@ -80,5 +89,95 @@ void main() {
     c.toggleLanguage();
     await t.pumpAndSettle();
     expect(find.text('حاسبة'), findsOneWidget);
+  });
+
+  testWidgets('the crown and the koz land on the right seats', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(1600, 720);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+
+    final c = GameController()
+      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..screen = Screen.bid
+      // One round on the sheet: Sara out front, Omar propping it up.
+      ..rounds = [
+        Round(
+          bids: [3, 3, 3, 3],
+          dash: List<bool>.filled(4, false),
+          order: const [],
+          tricks: [3, 3, 3, 4],
+          scores: [10, 20, 30, -10],
+        ),
+      ];
+
+    await t.pumpWidget(EstimationApp(controller: c));
+    await t.pumpAndSettle();
+
+    expect(c.laggardIndex, 3);
+    expect(c.leaderIndex, 2);
+    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    expect(
+      find.image(const AssetImage('assets/koz.png')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('game over crowns the winner and kozzes the loser', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(1600, 720);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+
+    final c = GameController()
+      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..screen = Screen.done
+      ..rounds = [
+        Round(
+          bids: [3, 3, 3, 3],
+          dash: List<bool>.filled(4, false),
+          order: const [],
+          tricks: [3, 3, 3, 4],
+          scores: [10, 20, 30, -10],
+        ),
+      ];
+
+    await t.pumpWidget(EstimationApp(controller: c));
+    await t.pumpAndSettle();
+
+    // Sara took it, Omar wears it.
+    expect(find.text('Sara'), findsOneWidget);
+    expect(find.text('wins with 30 points'), findsOneWidget);
+    expect(find.text('Omar'), findsOneWidget);
+    expect(find.text('loses with -10 points'), findsOneWidget);
+    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    expect(find.image(const AssetImage('assets/koz.png')), findsOneWidget);
+  });
+
+  testWidgets('a table level all the way across gets no koz', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(1600, 720);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+
+    final c = GameController()
+      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..screen = Screen.done
+      ..rounds = [
+        Round(
+          bids: [3, 3, 3, 3],
+          dash: List<bool>.filled(4, false),
+          order: const [],
+          tricks: [3, 3, 3, 4],
+          scores: [10, 10, 10, 10],
+        ),
+      ];
+
+    await t.pumpWidget(EstimationApp(controller: c));
+    await t.pumpAndSettle();
+
+    // Everyone shares the crown; nobody is singled out for the koz.
+    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    expect(find.image(const AssetImage('assets/koz.png')), findsNothing);
   });
 }

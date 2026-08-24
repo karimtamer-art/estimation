@@ -18,3 +18,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # The crown and the koz, worn by whoever is out front and whoever is dead
+    # last. Everything else the app draws itself; these two are pictures on
+    # purpose — they are the trophy and the punishment.
+    - assets/crown.png
+    - assets/koz.png

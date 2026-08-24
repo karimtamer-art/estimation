@@ -552,23 +552,52 @@ class DoneScreen extends StatelessWidget {
     final s = c.s;
     final totals = c.totals;
     final best = totals.reduce((a, b) => a > b ? a : b);
+    final worst = totals.reduce((a, b) => a < b ? a : b);
     final winners = <String>[];
+    final losers = <String>[];
     for (var i = 0; i < totals.length; i++) {
       if (totals[i] == best) winners.add(c.players[i]);
+      if (totals[i] == worst) losers.add(c.players[i]);
     }
+    // A table level all the way across has no loser to point at.
+    final showKoz = losers.length < c.playerCount;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 32),
       children: [
         Text(s.gameOver, style: labelStyle()),
-        const SizedBox(height: 10),
-        Text(winners.join(' & '),
-            style: const TextStyle(
-                fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: -1.2)),
-        const SizedBox(height: 6),
-        Text('${winners.length > 1 ? s.tieAt : s.winsWith} $best ${s.points}',
-            style: labelStyle(size: 13)),
-        const SizedBox(height: 18),
+        const SizedBox(height: 8),
+        // The trophy and the punishment, side by side and the same size, so
+        // the table sees both from wherever they are sitting.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _EndPanel(
+                asset: 'assets/crown.png',
+                label: s.king,
+                color: AppColors.gold,
+                names: winners.join(' & '),
+                line: '${winners.length > 1 ? s.tieAt : s.winsWith} '
+                    '$best ${s.points}',
+              ),
+            ),
+            if (showKoz) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _EndPanel(
+                  asset: 'assets/koz.png',
+                  label: s.koz,
+                  color: AppColors.red,
+                  names: losers.join(' & '),
+                  line: '${losers.length > 1 ? s.tiedLast : s.losesWith} '
+                      '$worst ${s.points}',
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(child: PrimaryButton(s.newGame, onTap: c.newGame)),
@@ -578,6 +607,70 @@ class DoneScreen extends StatelessWidget {
         ),
         Scoreboard(c: c),
       ],
+    );
+  }
+}
+
+/// Game over, and the koz goes up where nobody can miss it: the face as big as
+/// the panel allows, the name under it, and the score that earned it.
+/// Game over: one of the two verdicts, framed in its own colour. The crown and
+/// the koz are the same size on purpose — the table should read either from
+/// wherever they are sitting.
+class _EndPanel extends StatelessWidget {
+  final String asset;
+  final String label;
+  final Color color;
+  final String names;
+  final String line;
+  const _EndPanel({
+    required this.asset,
+    required this.label,
+    required this.color,
+    required this.names,
+    required this.line,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        border: Border.all(color: color),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            asset,
+            height: 118,
+            semanticLabel: label,
+            filterQuality: FilterQuality.medium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            names,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            line,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: labelStyle(size: 10, color: color),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
+import 'package:estimation/models.dart';
 import 'package:estimation/widgets.dart';
 
 /// Starts a game and lets the dash window come up, the way the app does it:
@@ -77,5 +78,27 @@ void main() {
 
     await t.pump(const Duration(seconds: kDashWindowSeconds + 1));
     await t.pumpAndSettle();
+  });
+
+  testWidgets('color rounds open without the dash window', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(1600, 720);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+
+    // Mini is five normal rounds then five color ones; with five played, the
+    // round about to open is a color round.
+    final c = GameController()
+      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..mode = GameMode.mini
+      ..rounds = List.generate(5, (_) => Round.empty(4));
+
+    await t.pumpWidget(EstimationApp(controller: c));
+    c.startGame();
+    await t.pumpAndSettle();
+
+    expect(c.isColorRound, isTrue);
+    expect(c.dashPromptPending, isFalse);
+    expect(find.text('Wait for dash'), findsNothing);
   });
 }

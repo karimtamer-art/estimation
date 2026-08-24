@@ -64,11 +64,22 @@ class SeatColumn extends StatelessWidget {
         children: [
           // Crown / koz row — fixed height so seats stay aligned when empty.
           SizedBox(
-            height: 20,
-            child: Text(
-              crown ? '👑' : (koz ? '🤡' : ''),
-              style: const TextStyle(fontSize: 16),
-            ),
+            height: 26,
+            child: crown
+                ? Image.asset(
+                    'assets/crown.png',
+                    height: 26,
+                    semanticLabel: s.king,
+                    filterQuality: FilterQuality.medium,
+                  )
+                : (koz
+                    ? Image.asset(
+                        'assets/koz.png',
+                        height: 26,
+                        semanticLabel: s.koz,
+                        filterQuality: FilterQuality.medium,
+                      )
+                    : null),
           ),
           Text(
             c.players[index],
@@ -93,15 +104,8 @@ class SeatColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          // Calling is one press: the number opens the pad and the estimate is
-          // picked outright. The steppers stay on the tricks screen, where
-          // counting up one at a time is how the hand actually plays out.
-          if (!isBid)
-            _StepButton(
-              label: '+',
-              enabled: !isDash,
-              onTap: () => c.step(index, 1),
-            ),
+          // Both screens are one press: the number opens the pad and the value
+          // is picked outright, never nudged.
           _NumberTarget(
             enabled: !isDash,
             max: c.rules.tricks,
@@ -120,11 +124,16 @@ class SeatColumn extends StatelessWidget {
               ),
             ),
           ),
+          // The seat that took exactly what it called: one press instead of
+          // hunting for its own number on the pad.
           if (!isBid)
-            _StepButton(
-              label: '\u2212',
-              enabled: !isDash,
-              onTap: () => c.step(index, -1),
+            _MadeButton(
+              label: s.gotThem,
+              selected: value != null && value == c.working.bids[index],
+              // Held back when the call would put the table past thirteen —
+              // the same rule that strikes the number out on the pad.
+              enabled: c.canPick(index, c.working.bids[index] ?? 0),
+              onTap: () => c.madeBid(index),
             ),
           const SizedBox(height: 7),
 
@@ -380,12 +389,16 @@ class _PadCell extends StatelessWidget {
   }
 }
 
-class _StepButton extends StatelessWidget {
+/// "Got them" under a seat on the tricks screen: fills in the estimate the
+/// seat called, and lights up while the number still matches it.
+class _MadeButton extends StatelessWidget {
   final String label;
+  final bool selected;
   final bool enabled;
   final VoidCallback onTap;
-  const _StepButton({
+  const _MadeButton({
     required this.label,
+    required this.selected,
     required this.enabled,
     required this.onTap,
   });
@@ -393,27 +406,31 @@ class _StepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Opacity(
-      opacity: enabled ? 1 : 0.22,
+      opacity: enabled || selected ? 1 : 0.3,
       child: Material(
-        color: AppColors.raise,
+        color: selected ? AppColors.gold : AppColors.raise,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: enabled ? onTap : null,
           child: Container(
             width: double.infinity,
-            height: 40,
+            height: 38,
             alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.line),
+              border:
+                  Border.all(color: selected ? AppColors.gold : AppColors.line),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               label,
-              style: const TextStyle(
-                fontFamily: kMono,
-                fontSize: 19,
-                color: AppColors.text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.onGold : AppColors.text,
                 height: 1,
               ),
             ),
@@ -713,8 +730,8 @@ class Scoreboard extends StatelessWidget {
                   if (r.mult > 1)
                     Container(
                       margin: const EdgeInsets.only(left: 3),
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 3, vertical: 1),
                       decoration: BoxDecoration(
                         color: AppColors.gold,
                         borderRadius: BorderRadius.circular(2),
@@ -741,9 +758,10 @@ class Scoreboard extends StatelessWidget {
                       ),
                     ),
                     _detail(r, k,
-                        risk: (!r.skipped && d.riskIndex == k && d.riskLevel > 0)
-                            ? c.s.riskLabel(d.riskLevel)
-                            : null),
+                        risk:
+                            (!r.skipped && d.riskIndex == k && d.riskLevel > 0)
+                                ? c.s.riskLabel(d.riskLevel)
+                                : null),
                   ],
                 ),
               ),

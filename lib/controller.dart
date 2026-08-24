@@ -72,6 +72,11 @@ class GameController extends ChangeNotifier {
     return (f != null && !superCalled) ? f : null;
   }
 
+  /// A trailing round with its trump fixed by [kColorOrder]. The colors run in
+  /// a known order, so the table already knows what is coming and does not
+  /// need the dash window held open for it.
+  bool get isColorRound => mode.fixedTrump(_roundIndex) != null;
+
   Derived get derived => derive(working, rules);
 
   bool get bidsComplete {
@@ -119,11 +124,15 @@ class GameController extends ChangeNotifier {
       if (d.top != null && d.top! < rules.minCallerBid) {
         return '${s.errMinCaller} ${rules.minCallerBid}.';
       }
+      // A round does not start until the table has said who called it and
+      // under which trump. Both are pressed, never inferred.
+      final chosen = working.caller;
+      if (chosen == null) return s.errNoCaller;
+      if ((lockedTrump ?? working.trump) == null) return s.errNoTrump;
       // Pressing Caller on a seat that someone has outbid means either the
       // press or an estimate is wrong. The pad cannot prevent it — the press
       // can come after the numbers — so say it out loud.
-      final chosen = working.caller;
-      if (chosen != null && !working.dash[chosen]) {
+      if (!working.dash[chosen]) {
         final callerBid = working.bids[chosen];
         for (var i = 0; callerBid != null && i < playerCount; i++) {
           if (i == chosen || working.dash[i]) continue;
@@ -265,19 +274,11 @@ class GameController extends ChangeNotifier {
     _beginRound();
   }
 
-  /// Nudge a player's number. First press from unset lands on 0.
-  void step(int player, int delta) {
-    final isBid = screen == Screen.bid;
-    final list = isBid ? working.bids : working.tricks;
-    final cur = list[player];
-    list[player] = cur == null ? 0 : (cur + delta).clamp(0, rules.tricks);
-
-    if (isBid) {
-      working.dash[player] = false;
-      // Last player to settle their estimate carries the Risk.
-      working.order.remove(player);
-      working.order.add(player);
-    }
+  /// The seat took exactly what it called — the ordinary end to a hand, and
+  /// the one number nobody should have to hunt for on the pad. A dashed seat
+  /// called nothing, so making it means taking none.
+  void madeBid(int player) {
+    working.tricks[player] = working.bids[player] ?? 0;
     notifyListeners();
     _save();
   }
@@ -385,8 +386,8 @@ class GameController extends ChangeNotifier {
     working.caller = null;
     working.trump = null;
     // The re-estimate wipes the dashes with everything else, so the table gets
-    // its window back to declare them again.
-    dashPromptPending = true;
+    // its window back to declare them again — in the rounds that hold one.
+    dashPromptPending = !isColorRound;
     notifyListeners();
     _save();
   }
@@ -481,7 +482,7 @@ class GameController extends ChangeNotifier {
     working = Round.empty(playerCount);
     editingIndex = null;
     screen = Screen.bid;
-    dashPromptPending = prompt;
+    dashPromptPending = prompt && !isColorRound;
     _recompute();
     notifyListeners();
     _save();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'controller.dart';
@@ -5,7 +7,7 @@ import 'models.dart';
 import 'scoring.dart';
 import 'theme.dart';
 
-/// One player's column: name, +, value, −, role tags, dash toggle.
+/// One player's column: name, estimate or tricks, role badges, Caller and Dash.
 class SeatColumn extends StatelessWidget {
   final GameController c;
   final int index;
@@ -26,12 +28,17 @@ class SeatColumn extends StatelessWidget {
     final value = isBid ? c.working.bids[index] : c.working.tricks[index];
     final unset = value == null;
 
-    // The prominent badge: Caller / With / Dash. Derived, never chosen.
+    // The prominent badge: Caller / With / Dash. Once a seat has been pressed
+    // as Caller that seat wears Caller and anyone matching it wears With;
+    // with nobody pressed it falls back to reading it off the estimates.
+    final chosenCaller = c.working.caller;
     String? badge;
     if (isDash) {
       badge = s.dash;
     } else if (isBid && d.callerOrWith[index] && d.top != null) {
-      badge = d.callerOrWith.where((x) => x).length > 1 ? s.with_ : s.caller;
+      badge = chosenCaller != null
+          ? (chosenCaller == index ? s.caller : s.with_)
+          : (d.callerOrWith.where((x) => x).length > 1 ? s.with_ : s.caller);
     }
 
     final riskTag = (index == d.riskIndex && d.riskLevel > 0)
@@ -86,15 +93,21 @@ class SeatColumn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          _StepButton(
-            label: '+',
-            enabled: !isDash,
-            onTap: () => c.step(index, 1),
-          ),
+          // Calling is one press: the number opens the pad and the estimate is
+          // picked outright. The steppers stay on the tricks screen, where
+          // counting up one at a time is how the hand actually plays out.
+          if (!isBid)
+            _StepButton(
+              label: '+',
+              enabled: !isDash,
+              onTap: () => c.step(index, 1),
+            ),
           _NumberTarget(
             enabled: !isDash,
             max: c.rules.tricks,
             selected: value,
+            allow: (n) => c.canPick(index, n),
+            framed: isBid,
             onPicked: (n) => c.setValue(index, n),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -107,11 +120,12 @@ class SeatColumn extends StatelessWidget {
               ),
             ),
           ),
-          _StepButton(
-            label: '\u2212',
-            enabled: !isDash,
-            onTap: () => c.step(index, -1),
-          ),
+          if (!isBid)
+            _StepButton(
+              label: '\u2212',
+              enabled: !isDash,
+              onTap: () => c.step(index, -1),
+            ),
           const SizedBox(height: 7),
 
           // On the tricks screen, what this player actually called — big
@@ -190,11 +204,28 @@ class SeatColumn extends StatelessWidget {
           ),
           if (isBid) ...[
             const SizedBox(height: 5),
-            _DashButton(
-              label: s.dash,
-              selected: isDash,
-              enabled: canDash,
-              onTap: () => c.toggleDash(index),
+            // Who won the bidding is said out loud at the table, so it is
+            // pressed here rather than guessed from the numbers.
+            Row(
+              children: [
+                Expanded(
+                  child: _TagButton(
+                    label: s.caller,
+                    selected: chosenCaller == index,
+                    enabled: !isDash,
+                    onTap: () => c.setCaller(index),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: _TagButton(
+                    label: s.dash,
+                    selected: isDash,
+                    enabled: canDash,
+                    onTap: () => c.toggleDash(index),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -204,12 +235,18 @@ class SeatColumn extends StatelessWidget {
 }
 
 /// Tapping the big number opens a compact 0..[max] pad anchored to it,
-/// so a seven is one tap instead of seven.
+/// so a seven is one tap instead of seven. Numbers [allow] refuses are struck
+/// out in place — the pad shows why a number is gone instead of hiding it.
 class _NumberTarget extends StatelessWidget {
   final Widget child;
   final bool enabled;
   final int max;
   final int? selected;
+  final bool Function(int) allow;
+
+  /// Draw a border around the number so it reads as the button it is. Used on
+  /// the estimate screen, where there are no steppers to hint at it.
+  final bool framed;
   final ValueChanged<int> onPicked;
 
   const _NumberTarget({
@@ -217,7 +254,9 @@ class _NumberTarget extends StatelessWidget {
     required this.enabled,
     required this.max,
     required this.selected,
+    required this.allow,
     required this.onPicked,
+    this.framed = false,
   });
 
   Future<void> _open(BuildContext context) async {
@@ -258,6 +297,7 @@ class _NumberTarget extends StatelessWidget {
                     _PadCell(
                       value: n,
                       selected: n == selected,
+                      enabled: allow(n),
                       onTap: () => Navigator.pop(context, n),
                     ),
                 ],
@@ -273,11 +313,21 @@ class _NumberTarget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled) return child;
+    final body = framed
+        ? Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.line),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: child,
+          )
+        : child;
+    if (!enabled) return body;
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       onTap: () => _open(context),
-      child: child,
+      child: body,
     );
   }
 }
@@ -285,22 +335,28 @@ class _NumberTarget extends StatelessWidget {
 class _PadCell extends StatelessWidget {
   final int value;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _PadCell({
     required this.value,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Struck through and sunk into the background: still there, plainly not
+    // on offer.
     return Material(
-      color: selected ? AppColors.gold : AppColors.surface,
+      color: selected
+          ? AppColors.gold
+          : (enabled ? AppColors.surface : AppColors.bg),
       borderRadius: BorderRadius.circular(7),
       child: InkWell(
         borderRadius: BorderRadius.circular(7),
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         child: SizedBox(
           width: 30,
           height: 30,
@@ -309,7 +365,12 @@ class _PadCell extends StatelessWidget {
               '$value',
               style: numberStyle(
                 size: 15,
-                color: selected ? AppColors.onGold : AppColors.text,
+                color: selected
+                    ? AppColors.onGold
+                    : (enabled ? AppColors.text : AppColors.faint),
+              ).copyWith(
+                decoration: enabled ? null : TextDecoration.lineThrough,
+                decorationColor: AppColors.faint,
               ),
             ),
           ),
@@ -363,12 +424,13 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-class _DashButton extends StatelessWidget {
+/// A small on/off declaration under a seat: Caller, Dash. Filled when set.
+class _TagButton extends StatelessWidget {
   final String label;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
-  const _DashButton({
+  const _TagButton({
     required this.label,
     required this.selected,
     required this.enabled,
@@ -809,4 +871,253 @@ class _FanPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _FanPainter oldDelegate) => false;
+}
+
+// ------------------------------------------------------------- dash window
+
+/// How long the table has to declare a dash at the top of a round.
+const int kDashWindowSeconds = 15;
+
+/// Opens as each round starts. A dash is called out loud before anyone
+/// estimates, so the round holds still for a moment and offers the four seats
+/// — tap whoever says it. Closes itself when the countdown runs out.
+class DashWindow extends StatefulWidget {
+  final GameController c;
+  const DashWindow({super.key, required this.c});
+
+  static Future<void> show(BuildContext context, GameController c) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.62),
+      // The dialog is pushed above the Directionality that wraps the app, so
+      // it has to be told the language's direction itself.
+      builder: (_) => Directionality(
+        textDirection: c.arabic ? TextDirection.rtl : TextDirection.ltr,
+        child: DashWindow(c: c),
+      ),
+    );
+  }
+
+  @override
+  State<DashWindow> createState() => _DashWindowState();
+}
+
+class _DashWindowState extends State<DashWindow> {
+  int left = kDashWindowSeconds;
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Unmounted means the dialog is already gone — nothing left to close.
+      if (!mounted) return;
+      setState(() => left--);
+      if (left <= 0) {
+        _tick?.cancel();
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final s = c.s;
+    return AnimatedBuilder(
+      animation: c,
+      builder: (context, _) {
+        final dashed = c.working.dash;
+        final count = dashed.where((x) => x).length;
+        final full = count >= c.rules.maxDash;
+        final urgent = left <= 5;
+
+        return Dialog(
+          backgroundColor: AppColors.surface,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppColors.line),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.dashWindow,
+                              style: const TextStyle(
+                                  fontSize: 21, fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(s.dashWindowHint, style: labelStyle(size: 10)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // The clock, in the same mono as every other number.
+                      Text(
+                        '$left',
+                        style: numberStyle(
+                          size: 40,
+                          color: urgent ? AppColors.red : AppColors.gold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: left / kDashWindowSeconds,
+                      minHeight: 4,
+                      backgroundColor: AppColors.raise,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          urgent ? AppColors.red : AppColors.gold),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      for (var i = 0; i < c.playerCount; i++) ...[
+                        Expanded(
+                          child: _DashPick(
+                            name: c.players[i],
+                            selected: dashed[i],
+                            // Only as many dashes as the rules allow. The ones
+                            // already chosen stay pressable, so a seat that
+                            // spoke too soon can take it back.
+                            enabled: dashed[i] || !full,
+                            onTap: () => c.toggleDash(i),
+                          ),
+                        ),
+                        if (i < c.playerCount - 1) const SizedBox(width: 8),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          count == 0
+                              ? s.dashWindowNone
+                              : '${s.dash.toUpperCase()} ×$count',
+                          style: labelStyle(
+                            size: 10,
+                            color: count == 0 ? AppColors.dim : AppColors.gold,
+                          ),
+                        ),
+                      ),
+                      _DialogButton(
+                        label: s.done,
+                        onTap: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// One seat inside the dash window: big enough to hit across the table.
+class _DashPick extends StatelessWidget {
+  final String name;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _DashPick({
+    required this.name,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.3,
+      child: Material(
+        color: selected ? AppColors.gold : AppColors.raise,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: enabled ? onTap : null,
+          child: Container(
+            height: 54,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border:
+                  Border.all(color: selected ? AppColors.gold : AppColors.line),
+            ),
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.onGold : AppColors.text,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _DialogButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.gold,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: onTap,
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: AppColors.onGold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

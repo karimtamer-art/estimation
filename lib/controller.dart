@@ -38,6 +38,19 @@ class GameController extends ChangeNotifier {
   /// Which round the result screen is showing (an edit may not be the last).
   int resultIndex = 0;
 
+  /// Raised when a fresh round opens: the table gets a fixed window to declare
+  /// a dash before anyone estimates. UI state, so it is never persisted — a
+  /// game resumed mid-round does not reopen the window.
+  bool dashPromptPending = false;
+
+  /// True once, for the one build that should open the dash window. Lowering
+  /// the flag here keeps a rebuild from stacking a second dialog.
+  bool takeDashPrompt() {
+    if (!dashPromptPending) return false;
+    dashPromptPending = false;
+    return true;
+  }
+
   Str get s => Str(arabic);
 
   int get playerCount => players.length;
@@ -105,6 +118,18 @@ class GameController extends ChangeNotifier {
       if (d.total == rules.tricks) return s.errTotal13;
       if (d.top != null && d.top! < rules.minCallerBid) {
         return '${s.errMinCaller} ${rules.minCallerBid}.';
+      }
+      // Pressing Caller on a seat that someone has outbid means either the
+      // press or an estimate is wrong. The pad cannot prevent it — the press
+      // can come after the numbers — so say it out loud.
+      final chosen = working.caller;
+      if (chosen != null && !working.dash[chosen]) {
+        final callerBid = working.bids[chosen];
+        for (var i = 0; callerBid != null && i < playerCount; i++) {
+          if (i == chosen || working.dash[i]) continue;
+          final b = working.bids[i];
+          if (b != null && b > callerBid) return s.errCallerNotTop;
+        }
       }
     } else if (screen == Screen.tricks) {
       if (!tricksComplete) return null;
@@ -257,6 +282,56 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// Whether [player] may be given [value] on the screen currently open.
+  /// The pad greys out everything this refuses, so a number the round's rules
+  /// forbid is never entered and then rejected a step later.
+  bool canPick(int player, int value) {
+    if (value < 0 || value > rules.tricks) return false;
+    final list = screen == Screen.tricks ? working.tricks : working.bids;
+
+    // What the rest of the table has already settled, and how many have not.
+    var settled = 0;
+    var pending = 0;
+    for (var i = 0; i < playerCount; i++) {
+      if (i == player) continue;
+      if (screen == Screen.bid && working.dash[i]) continue;
+      final v = list[i];
+      if (v == null) {
+        pending++;
+      } else {
+        settled += v;
+      }
+    }
+
+    if (screen == Screen.tricks) {
+      // Thirteen tricks exist and all of them are won: never more, and the
+      // last seat to fill in gets only the number that completes the table.
+      if (settled + value > rules.tricks) return false;
+      if (pending == 0) return settled + value == rules.tricks;
+      return true;
+    }
+
+    final caller = working.caller;
+    if (caller != null && caller != player) {
+      // Nobody outbids the caller. Matching is fine — that is With.
+      final callerBid = working.bids[caller];
+      if (callerBid != null && value > callerBid) return false;
+    }
+    if (caller == player) {
+      if (value < rules.minCallerBid) return false;
+      // The call has to be the top of the table to be the call.
+      for (var i = 0; i < playerCount; i++) {
+        if (i == player || working.dash[i]) continue;
+        final b = working.bids[i];
+        if (b != null && b > value) return false;
+      }
+    }
+    // The estimates may not land on exactly 13 — which is only knowable once
+    // this seat is the last one left to settle.
+    if (pending == 0 && settled + value == rules.tricks) return false;
+    return true;
+  }
+
   /// Set a player's number outright, as picked from the number pad.
   /// Same bookkeeping as [step] — dash clears and the player moves to the
   /// back of the estimate order, since they just settled.
@@ -274,9 +349,20 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// Mark which seat won the bidding. Pressing the same seat again clears it,
+  /// which hands the Caller back to whoever holds the highest estimate.
+  void setCaller(int player) {
+    if (working.dash[player]) return; // a dashed seat called nothing
+    working.caller = working.caller == player ? null : player;
+    notifyListeners();
+    _save();
+  }
+
   void toggleDash(int player) {
     final on = !working.dash[player];
     if (on && working.dash.where((d) => d).length >= rules.maxDash) return;
+    // Dashing gives up on the round, so it cannot also be the call.
+    if (on && working.caller == player) working.caller = null;
     working.dash[player] = on;
     working.bids[player] = on ? 0 : null;
     working.order.remove(player);
@@ -296,7 +382,11 @@ class GameController extends ChangeNotifier {
     working.bids = List<int?>.filled(playerCount, null);
     working.dash = List<bool>.filled(playerCount, false);
     working.order = [];
+    working.caller = null;
     working.trump = null;
+    // The re-estimate wipes the dashes with everything else, so the table gets
+    // its window back to declare them again.
+    dashPromptPending = true;
     notifyListeners();
     _save();
   }
@@ -361,7 +451,7 @@ class GameController extends ChangeNotifier {
     if (rounds.isEmpty) return;
     rounds.removeLast();
     _recompute();
-    _beginRound();
+    _beginRound(prompt: false);
   }
 
   void editRound(int i) {
@@ -385,10 +475,13 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
-  void _beginRound() {
+  /// [prompt] opens the dash window. Undo re-opens a round the table has
+  /// already sat through, so it comes back without one.
+  void _beginRound({bool prompt = true}) {
     working = Round.empty(playerCount);
     editingIndex = null;
     screen = Screen.bid;
+    dashPromptPending = prompt;
     _recompute();
     notifyListeners();
     _save();

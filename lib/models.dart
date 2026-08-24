@@ -91,6 +91,11 @@ class Round {
   /// carries the Risk, because they are the one forced away from 13.
   List<int> order;
 
+  /// The seat that won the bidding, once someone presses Caller. Null means
+  /// nobody said, and the caller falls back to whoever holds the highest
+  /// estimate — the rule this app used before the button existed.
+  int? caller;
+
   List<int?> tricks;
   Suit? trump;
   int houseMult;
@@ -106,6 +111,7 @@ class Round {
     required this.dash,
     required this.order,
     required this.tricks,
+    this.caller,
     this.trump,
     this.houseMult = 1,
     this.skipped = false,
@@ -127,6 +133,7 @@ class Round {
         dash: List<bool>.from(dash),
         order: List<int>.from(order),
         tricks: List<int?>.from(tricks),
+        caller: caller,
         trump: trump,
         houseMult: houseMult,
         skipped: skipped,
@@ -139,6 +146,7 @@ class Round {
         'dash': dash,
         'order': order,
         'tricks': tricks,
+        'caller': caller,
         'trump': trump?.index,
         'houseMult': houseMult,
         'skipped': skipped,
@@ -149,6 +157,7 @@ class Round {
         dash: (j['dash'] as List).map((e) => e as bool).toList(),
         order: (j['order'] as List).map((e) => (e as num).toInt()).toList(),
         tricks: (j['tricks'] as List).map((e) => (e as num?)?.toInt()).toList(),
+        caller: (j['caller'] as num?)?.toInt(),
         trump: j['trump'] == null ? null : Suit.values[(j['trump'] as num).toInt()],
         houseMult: (j['houseMult'] as num?)?.toInt() ?? 1,
         skipped: j['skipped'] as bool? ?? false,

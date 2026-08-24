@@ -11,6 +11,10 @@ class Str {
   String get estimate => _p('estimate', 'التقدير');
   String get tricksWon => _p('tricks won', 'اللمات');
   String get dash => _p('Dash', 'داش');
+  String get dashWindow => _p('Wait for dash', 'انتظروا الداش');
+  String get dashWindowHint => _p('Anyone calling dash, say it now — tap them.',
+      'اللي هيقول داش يقولها دلوقتي — اضغط عليه.');
+  String get dashWindowNone => _p('Nobody dashed', 'محدش داش');
   String get back => _p('Back', 'رجوع');
   String get total => _p('total', 'المجموع');
   String get direction => _p('round', 'الجولة');
@@ -56,6 +60,9 @@ class Str {
           'المجموع ١٣ بالضبط — لازم أحد يغيّر.');
   String get errTricksSum =>
       _p('Tricks must total 13.', 'مجموع اللمات لازم ١٣.');
+  String get errCallerNotTop => _p(
+      'The Caller must hold the highest estimate.',
+      'الكولر لازم يكون صاحب أعلى تقدير.');
   String get errMinCaller =>
       _p('Caller must estimate at least', 'الكولر لازم يقدّر على الأقل');
   String get errAllEqual => _p(

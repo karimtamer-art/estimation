@@ -44,13 +44,30 @@ class EstimationApp extends StatelessWidget {
   }
 }
 
-class HomeShell extends StatelessWidget {
+class HomeShell extends StatefulWidget {
   final GameController c;
   const HomeShell({super.key, required this.c});
 
   @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  GameController get c => widget.c;
+
+  @override
   Widget build(BuildContext context) {
     final s = c.s;
+
+    // A fresh round raises the dash flag; open the window once the frame it
+    // was raised in is on screen. takeDashPrompt lowers it, so the rebuilds
+    // that follow cannot stack a second dialog on top.
+    if (c.dashPromptPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (c.takeDashPrompt()) DashWindow.show(context, c);
+      });
+    }
     final showHeader =
         c.screen != Screen.setup &&
             c.screen != Screen.setupPlayers &&

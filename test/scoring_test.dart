@@ -12,6 +12,7 @@ Round build({
   required List<int?> tricks,
   List<bool>? dash,
   List<int>? order,
+  int? caller,
   int mult = 1,
 }) {
   return Round(
@@ -19,6 +20,7 @@ Round build({
     dash: dash ?? List<bool>.filled(bids.length, false),
     order: order ?? List<int>.generate(bids.length, (i) => i),
     tricks: tricks,
+    caller: caller,
     mult: mult,
   );
 }
@@ -101,5 +103,30 @@ void main() {
     final r = build(bids: [6, 3, 3, 2], tricks: [6, 3, 2, 2], mult: 2);
     final out = scoreRound(r, rules, s);
     expect(out.scores[0], 52);
+  });
+  test('a pressed Caller owns the round even under the highest estimate', () {
+    // Seat 1 sits above seat 0 on the sheet, but seat 0 is the one the table
+    // pressed Caller on, so the Caller bonus is seat 0's.
+    final r = build(bids: [5, 6, 3, 2], tricks: [5, 6, 3, 2], caller: 0);
+    final d = derive(r, rules);
+    expect(d.top, 5);
+    expect(d.callerOrWith, [true, false, false, false]);
+    final out = scoreRound(r, rules, s);
+    // round 10 + tricks 5 + caller 10 = 25; seat 1 takes no caller bonus.
+    expect(out.scores[0], 25);
+    expect(out.scores[1], 16);
+  });
+
+  test('with nobody pressed the Caller is still the highest estimate', () {
+    final r = build(bids: [5, 6, 3, 2], tricks: [5, 6, 3, 2]);
+    final d = derive(r, rules);
+    expect(d.top, 6);
+    expect(d.callerOrWith, [false, true, false, false]);
+  });
+
+  test('anyone matching the pressed Caller is With', () {
+    final r = build(bids: [5, 5, 3, 2], tricks: [5, 5, 3, 2], caller: 1);
+    final d = derive(r, rules);
+    expect(d.callerOrWith, [true, true, false, false]);
   });
 }

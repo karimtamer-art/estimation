@@ -11,9 +11,10 @@ class Derived {
   /// Highest estimate on the table, or null if everyone dashed.
   final int? top;
 
-  /// Per player: true if they are Caller or With. Caller is simply the highest
-  /// estimate; anyone matching it is With. The two score identically, so a tie
-  /// at the top needs no tie-break.
+  /// Per player: true if they are Caller or With. The Caller is whoever the
+  /// table pressed Caller on, or the highest estimate when nobody did; anyone
+  /// matching that estimate is With. The two score identically, so a tie at
+  /// the top needs no tie-break.
   final List<bool> callerOrWith;
 
   /// Player carrying the Risk: the last one to settle their estimate.
@@ -41,10 +42,17 @@ Derived derive(Round r, Rules rules) {
     if (!r.dash[i]) total += r.bids[i] ?? 0;
   }
 
+  // The estimate that owns the round. A pressed Caller button says it
+  // outright; with nobody pressed it is the highest estimate on the table.
   int? top;
-  for (var i = 0; i < r.bids.length; i++) {
-    final b = r.bids[i];
-    if (!r.dash[i] && b != null && (top == null || b > top)) top = b;
+  final chosen = r.caller;
+  if (chosen != null && chosen < r.bids.length && !r.dash[chosen]) {
+    top = r.bids[chosen];
+  } else {
+    for (var i = 0; i < r.bids.length; i++) {
+      final b = r.bids[i];
+      if (!r.dash[i] && b != null && (top == null || b > top)) top = b;
+    }
   }
 
   final cw = List<bool>.generate(

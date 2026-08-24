@@ -1,0 +1,69 @@
+# Build the web app and publish it to GitHub Pages.
+#
+# web/ is not in git (see .gitignore), so this regenerates it the same way
+# codemagic.yaml does — flutter create, then tool/apply_branding.sh to paint
+# the app's own icons over the Flutter template's.
+name: Web · Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.8
+          channel: stable
+          cache: true
+
+      - name: Regenerate platform folders
+        run: |
+          flutter create . --project-name estimation --org com.calculator --platforms web
+          # flutter create re-adds its counter template test, which refers to a
+          # MyApp class this app does not have and fails analyze.
+          rm -f test/widget_test.dart
+          flutter pub get
+          bash tool/apply_branding.sh
+
+      - name: Analyze and test
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test
+
+      # Pages serves the repo at /estimation/, so the app has to be told.
+      - name: Build web
+        run: flutter build web --release --base-href /estimation/
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

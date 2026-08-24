@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'models.dart';
+
 class AppColors {
   static const bg = Color(0xFF0F1C22);
   static const surface = Color(0xFF17282F);
@@ -12,6 +14,23 @@ class AppColors {
   static const onGold = Color(0xFF1A1205);
   static const green = Color(0xFF5FC08B);
   static const red = Color(0xFFE0705C);
+}
+
+/// Each game length carries its own accent, so the picker reads at a glance
+/// and the chosen length keeps that colour on the screen after it.
+extension ModeAccent on GameMode {
+  Color get accent => const {
+        GameMode.micro: Color(0xFF5FC08B),
+        GameMode.mini: Color(0xFF57A6E0),
+        GameMode.full: Color(0xFFD9A441),
+      }[this]!;
+
+  /// Text laid over [accent] at full strength.
+  Color get onAccent => const {
+        GameMode.micro: Color(0xFF06241A),
+        GameMode.mini: Color(0xFF041825),
+        GameMode.full: Color(0xFF1A1205),
+      }[this]!;
 }
 
 /// Platform monospace, used for every number so columns stay aligned.

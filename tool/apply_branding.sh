@@ -22,6 +22,7 @@ copy() { # from to
 # ------------------------------------------------------------------- web
 if [ -d "$root/web" ]; then
   copy "$src/web/favicon.png" "$root/web/favicon.png"
+  copy "$src/web/apple-touch-icon.png" "$root/web/icons/apple-touch-icon.png"
   for f in Icon-192 Icon-512 Icon-maskable-192 Icon-maskable-512; do
     copy "$src/web/$f.png" "$root/web/icons/$f.png"
   done
@@ -30,6 +31,7 @@ if [ -d "$root/web" ]; then
   # with the app's. Written via temp files: BSD and GNU sed disagree about -i.
   if [ -f "$root/web/index.html" ]; then
     sed -e 's|<title>estimation</title>|<title>Estimation</title>|' \
+        -e 's|href="icons/Icon-192.png"|href="icons/apple-touch-icon.png"|' \
         -e 's|content="estimation"|content="Estimation"|' \
         -e 's|content="A new Flutter project."|content="Estimation scorekeeper — Pocket/Egyptian ruleset."|' \
         "$root/web/index.html" > "$root/web/index.html.tmp"

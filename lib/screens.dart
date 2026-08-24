@@ -186,6 +186,8 @@ class _MiniBtn extends StatelessWidget {
 
 // -------------------------------------------------------------------- setup
 
+/// The length picker: three coloured buttons, no scrolling. Tapping one is
+/// both the choice and the Next button, so setup is a single gesture.
 class SetupScreen extends StatelessWidget {
   final GameController c;
   const SetupScreen({super.key, required this.c});
@@ -193,47 +195,133 @@ class SetupScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = c.s;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
-      children: [
-        Text(s.appName,
-            style: const TextStyle(
-                fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1)),
-        const SizedBox(height: 20),
-        Text(s.length, style: labelStyle()),
-        const SizedBox(height: 8),
-        for (final m in GameMode.values) ...[
-          GestureDetector(
-            onTap: () => c.setMode(m),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 7),
-              padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
-              decoration: BoxDecoration(
-                color: c.mode == m ? AppColors.raise : AppColors.surface,
-                border: Border.all(
-                    color: c.mode == m ? AppColors.gold : AppColors.line),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(m.label(c.arabic),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${m.totalRounds} ${s.rounds} · ${m.normalRounds} ${s.normal}'
-                    '${m.colorRounds > 0 ? ' + ${m.colorRounds} ${s.color}' : ''}'
-                    '${m.isHouse ? ' · ${s.houseRule}' : ''}',
-                    style: labelStyle(size: 10),
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.appName,
+              style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1)),
+          const SizedBox(height: 4),
+          Text(s.length, style: labelStyle()),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Row(
+              children: [
+                for (final m in GameMode.values) ...[
+                  Expanded(child: _ModeCard(c: c, mode: m)),
+                  if (m != GameMode.values.last) const SizedBox(width: 10),
                 ],
-              ),
+              ],
             ),
           ),
         ],
-        const SizedBox(height: 12),
-        PrimaryButton(s.next, onTap: c.toPlayers),
+      ),
+    );
+  }
+}
+
+/// One length, in its own colour. The previously chosen length keeps a
+/// brighter border so a returning table can see where it left off.
+class _ModeCard extends StatelessWidget {
+  final GameController c;
+  final GameMode mode;
+  const _ModeCard({required this.c, required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    final accent = mode.accent;
+    final current = c.mode == mode;
+    final radius = BorderRadius.circular(14);
+    return Material(
+      color: Color.alphaBlend(
+          accent.withOpacity(current ? 0.20 : 0.09), AppColors.surface),
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        splashColor: accent.withOpacity(0.22),
+        onTap: () => c.chooseMode(mode),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: accent.withOpacity(current ? 1 : 0.45),
+              width: current ? 2 : 1.4,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                mode.label(c.arabic),
+                style: TextStyle(
+                    fontSize: 22, fontWeight: FontWeight.w700, color: accent),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('${mode.totalRounds}',
+                      style: numberStyle(
+                          color: accent, size: 34, weight: FontWeight.w700)),
+                  const SizedBox(width: 6),
+                  Text(s.rounds, style: labelStyle(size: 10)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _ModeLine(text: '${mode.normalRounds} ${s.normal}', dot: accent),
+              if (mode.colorRounds > 0) ...[
+                const SizedBox(height: 5),
+                _ModeLine(text: '${mode.colorRounds} ${s.color}', dot: accent),
+              ],
+              const Spacer(),
+              if (mode.isHouse)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(s.houseRule,
+                      style: labelStyle(size: 9, color: accent)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A bullet in the length's own colour, then the breakdown it describes.
+class _ModeLine extends StatelessWidget {
+  final String text;
+  final Color dot;
+  const _ModeLine({required this.text, required this.dot});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 5,
+          height: 5,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 7),
+        Flexible(
+          child: Text(text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: labelStyle(size: 10, color: AppColors.text)),
+        ),
       ],
     );
   }
@@ -257,7 +345,7 @@ class PlayersScreen extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1)),
         const SizedBox(height: 6),
-        Text(c.mode.label(c.arabic), style: labelStyle(color: AppColors.gold)),
+        Text(c.mode.label(c.arabic), style: labelStyle(color: c.mode.accent)),
         const SizedBox(height: 20),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -188,6 +188,14 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// The length picker is one tap: choosing a length is also the Next button.
+  void chooseMode(GameMode m) {
+    mode = m;
+    screen = Screen.setupPlayers;
+    notifyListeners();
+    _save();
+  }
+
   void setPlayer(int i, String name) {
     players[i] = name;
     _save();

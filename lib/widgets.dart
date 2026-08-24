@@ -7,6 +7,36 @@ import 'models.dart';
 import 'scoring.dart';
 import 'theme.dart';
 
+/// The crown or the koz for one seat, wherever the standing is shown: on the
+/// seats through the round, on the running sheet, on the sheet after it is
+/// scored. Empty space of the same height when the seat is neither out front
+/// nor dead last, so a row of seats stays aligned — and nothing at all while
+/// the lead is shared, since a mark everyone wears says nothing.
+class RankMark extends StatelessWidget {
+  final GameController c;
+  final int index;
+  final double size;
+  const RankMark({
+    super.key,
+    required this.c,
+    required this.index,
+    this.size = 26,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final crown = c.leaderIndex == index;
+    final koz = c.laggardIndex == index;
+    if (!crown && !koz) return SizedBox(height: size);
+    return Image.asset(
+      crown ? 'assets/crown.png' : 'assets/koz.png',
+      height: size,
+      semanticLabel: crown ? c.s.king : c.s.koz,
+      filterQuality: FilterQuality.medium,
+    );
+  }
+}
+
 /// One player's column: name, estimate or tricks, role badges, Caller and Dash.
 class SeatColumn extends StatelessWidget {
   final GameController c;
@@ -63,24 +93,7 @@ class SeatColumn extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Crown / koz row — fixed height so seats stay aligned when empty.
-          SizedBox(
-            height: 26,
-            child: crown
-                ? Image.asset(
-                    'assets/crown.png',
-                    height: 26,
-                    semanticLabel: s.king,
-                    filterQuality: FilterQuality.medium,
-                  )
-                : (koz
-                    ? Image.asset(
-                        'assets/koz.png',
-                        height: 26,
-                        semanticLabel: s.koz,
-                        filterQuality: FilterQuality.medium,
-                      )
-                    : null),
-          ),
+          RankMark(c: c, index: index, size: 34),
           Text(
             c.players[index],
             maxLines: 1,
@@ -658,16 +671,25 @@ class Scoreboard extends StatelessWidget {
         const SizedBox(height: 20),
         Text(s.scoreboard, style: labelStyle()),
         const SizedBox(height: 10),
+        // The sheet wears the standing too: crown over whoever is out front,
+        // koz over whoever is propping it up, on every screen that shows it.
         Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             SizedBox(width: 40, child: Text('#', style: head())),
-            for (final p in c.players)
+            for (var i = 0; i < c.players.length; i++)
               Expanded(
-                child: Text(p.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: head()),
+                child: Column(
+                  children: [
+                    RankMark(c: c, index: i, size: 22),
+                    const SizedBox(height: 3),
+                    Text(c.players[i].toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: head()),
+                  ],
+                ),
               ),
           ],
         ),

@@ -21,6 +21,12 @@ class GameController extends ChangeNotifier {
 
   GameMode mode = GameMode.full;
   List<String> players = ['', '', '', ''];
+
+  /// Names being typed on the setup screen. Kept apart from [players] so a new
+  /// game starts on blank seats without touching the names of the game still
+  /// sitting there to be resumed.
+  List<String> draftPlayers = ['', '', '', ''];
+
   List<Round> rounds = [];
 
   /// Round currently being entered.
@@ -181,8 +187,10 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
-  /// Home -> length setup. Names come after, on their own screen.
+  /// Home -> length setup. Names come after, on their own screen, and they
+  /// start blank: a new table is not last week's table.
   void toSetup() {
+    draftPlayers = List<String>.filled(playerCount, '');
     screen = Screen.setup;
     notifyListeners();
     _save();
@@ -231,7 +239,7 @@ class GameController extends ChangeNotifier {
   }
 
   void setPlayer(int i, String name) {
-    players[i] = name;
+    draftPlayers[i] = name;
     _save();
   }
 
@@ -267,9 +275,11 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// The draft becomes the table. A seat left blank is named for its number.
   void startGame() {
     for (var i = 0; i < players.length; i++) {
-      if (players[i].trim().isEmpty) players[i] = 'P${i + 1}';
+      final name = i < draftPlayers.length ? draftPlayers[i].trim() : '';
+      players[i] = name.isEmpty ? 'P${i + 1}' : name;
     }
     _beginRound();
   }
@@ -465,6 +475,7 @@ class GameController extends ChangeNotifier {
   }
 
   void newGame() {
+    draftPlayers = List<String>.filled(playerCount, '');
     rounds = [];
     editingIndex = null;
     pendingMult = 1;
@@ -507,6 +518,8 @@ class GameController extends ChangeNotifier {
         mode = GameMode.values[(j['mode'] as num?)?.toInt() ?? GameMode.full.index];
         players = (j['players'] as List?)?.map((e) => e as String).toList() ??
             ['', '', '', ''];
+        draftPlayers = (j['draft'] as List?)?.map((e) => e as String).toList() ??
+            List<String>.filled(players.length, '');
         rounds = (j['rounds'] as List?)
                 ?.map((e) => Round.fromJson(e as Map<String, dynamic>))
                 .toList() ??
@@ -541,6 +554,7 @@ class GameController extends ChangeNotifier {
           'arabic': arabic,
           'mode': mode.index,
           'players': players,
+          'draft': draftPlayers,
           'rounds': rounds.map((r) => r.toJson()).toList(),
           'working': working.toJson(),
           'screen': screen.index,

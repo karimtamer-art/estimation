@@ -116,11 +116,9 @@ void main() {
 
     expect(c.laggardIndex, 3);
     expect(c.leaderIndex, 2);
-    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
-    expect(
-      find.image(const AssetImage('assets/koz.png')),
-      findsOneWidget,
-    );
+    // Once on the seat itself, once over that seat's column on the sheet.
+    expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
+    expect(find.image(const AssetImage('assets/koz.png')), findsNWidgets(2));
   });
 
   testWidgets('game over crowns the winner and kozzes the loser', (t) async {
@@ -150,8 +148,9 @@ void main() {
     expect(find.text('wins with 30 points'), findsOneWidget);
     expect(find.text('Omar'), findsOneWidget);
     expect(find.text('loses with -10 points'), findsOneWidget);
-    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
-    expect(find.image(const AssetImage('assets/koz.png')), findsOneWidget);
+    // Once in its panel, once over its column on the sheet below.
+    expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
+    expect(find.image(const AssetImage('assets/koz.png')), findsNWidgets(2));
   });
 
   testWidgets('a table level all the way across gets no koz', (t) async {

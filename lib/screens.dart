@@ -396,7 +396,7 @@ class _NameField extends StatelessWidget {
         Text('${s.players} ${index + 1}', style: labelStyle(size: 10)),
         const SizedBox(height: 6),
         TextFormField(
-          initialValue: c.players[index],
+          initialValue: c.draftPlayers[index],
           maxLength: 14,
           textAlign: TextAlign.center,
           onChanged: (v) => c.setPlayer(index, v),

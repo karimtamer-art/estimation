@@ -15,7 +15,7 @@ Future<GameController> startGame(WidgetTester t) async {
   t.view.devicePixelRatio = 2.0;
   addTearDown(t.view.reset);
 
-  final c = GameController()..players = ['Karim', 'Ali', 'Sara', 'Omar'];
+  final c = GameController()..draftPlayers = ['Karim', 'Ali', 'Sara', 'Omar'];
   await t.pumpWidget(EstimationApp(controller: c));
   c.startGame();
   await t.pumpAndSettle();
@@ -89,7 +89,7 @@ void main() {
     // Mini is five normal rounds then five color ones; with five played, the
     // round about to open is a color round.
     final c = GameController()
-      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..draftPlayers = ['Karim', 'Ali', 'Sara', 'Omar']
       ..mode = GameMode.mini
       ..rounds = List.generate(5, (_) => Round.empty(4));
 

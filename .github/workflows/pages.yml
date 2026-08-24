@@ -24,7 +24,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: subosito/flutter-action@v2
         with:
@@ -50,9 +50,12 @@ jobs:
       - name: Build web
         run: flutter build web --release --base-href /estimation/
 
+      # Pages has to be switched on by hand, once, in
+      # Settings -> Pages -> Build and deployment -> Source: GitHub Actions.
+      # Doing it from here instead (enablement: true) needs repo-admin rights
+      # the workflow's GITHUB_TOKEN does not have: the create call comes back
+      # "Resource not accessible by integration".
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -108,6 +108,8 @@ class HomeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const LogoMark(size: 76),
+                      const SizedBox(height: 14),
                       Text(
                         s.appName,
                         style: const TextStyle(

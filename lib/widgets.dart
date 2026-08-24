@@ -730,3 +730,83 @@ class Scoreboard extends StatelessWidget {
     );
   }
 }
+
+// --------------------------------------------------------------------- logo
+
+/// The app mark, drawn rather than shipped as an asset so it stays sharp at
+/// any size and follows the theme. Four cards fanned — four seats — with the
+/// front one gold. Matches design/logo.svg.
+class LogoMark extends StatelessWidget {
+  final double size;
+  const LogoMark({super.key, this.size = 72});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _FanPainter()),
+    );
+  }
+}
+
+class _FanPainter extends CustomPainter {
+  // Geometry in the same 512 box as design/logo.svg, so the two cannot drift.
+  static const _rots = [-32.0, -10.5, 11.0, 32.5];
+  static const _cardW = 164.0, _cardH = 232.0, _radius = 22.0, _stroke = 13.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final k = size.width / 512;
+    canvas.save();
+    canvas.scale(k);
+    canvas.translate(256, 350);
+
+    final fill = Paint()..color = const Color(0xFF132229);
+    final gold = Paint()..color = AppColors.gold;
+    final edge = Paint()
+      ..color = AppColors.gold
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = _stroke;
+
+    for (var i = 0; i < _rots.length; i++) {
+      final front = i == _rots.length - 1;
+      canvas.save();
+      canvas.rotate(_rots[i] * 3.1415926535 / 180);
+      final r = RRect.fromRectAndRadius(
+        const Rect.fromLTWH(-_cardW / 2, -_cardH, _cardW, _cardH),
+        const Radius.circular(_radius),
+      );
+      canvas.drawRRect(r, front ? gold : fill);
+      canvas.drawRRect(r, edge);
+      if (front) _spade(canvas);
+      canvas.restore();
+    }
+    canvas.restore();
+  }
+
+  /// The pip on the gold face, in the card's own frame.
+  void _spade(Canvas canvas) {
+    canvas.save();
+    canvas.translate(0, -116);
+    canvas.scale(1.08);
+    canvas.translate(-50, -54);
+    final p = Path()
+      ..moveTo(50, 12)
+      ..cubicTo(31, 33, 13, 44, 13, 60)
+      ..cubicTo(13, 72, 22, 80, 33, 80)
+      ..cubicTo(40, 80, 46, 76, 49, 70)
+      ..cubicTo(48, 82, 44, 90, 36, 95)
+      ..lineTo(64, 95)
+      ..cubicTo(56, 90, 52, 82, 51, 70)
+      ..cubicTo(54, 76, 60, 80, 67, 80)
+      ..cubicTo(78, 80, 87, 72, 87, 60)
+      ..cubicTo(87, 44, 69, 33, 50, 12)
+      ..close();
+    canvas.drawPath(p, Paint()..color = AppColors.bg);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _FanPainter oldDelegate) => false;
+}

@@ -1,0 +1,22 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" width="512" height="512">
+  <title>Estimation</title>
+  <!-- Four cards fanned: four seats at the table, one gold face. -->
+  <rect width="512" height="512" fill="#0F1C22"/>
+  <g transform="translate(256,350) scale(0.72)">
+    <g transform="rotate(-32) translate(-82,-232)">
+      <rect width="164" height="232" rx="22" fill="#132229" stroke="#D9A441" stroke-width="13"/>
+    </g>
+    <g transform="rotate(-10.5) translate(-82,-232)">
+      <rect width="164" height="232" rx="22" fill="#132229" stroke="#D9A441" stroke-width="13"/>
+    </g>
+    <g transform="rotate(11) translate(-82,-232)">
+      <rect width="164" height="232" rx="22" fill="#132229" stroke="#D9A441" stroke-width="13"/>
+    </g>
+    <g transform="rotate(32.5) translate(-82,-232)">
+      <rect width="164" height="232" rx="22" fill="#D9A441" stroke="#D9A441" stroke-width="13"/>
+      <g transform="translate(82,116) scale(1.08) translate(-50,-54)">
+        <path fill="#0F1C22" d="M50 12 C31 33 13 44 13 60 C13 72 22 80 33 80 C40 80 46 76 49 70 C48 82 44 90 36 95 L64 95 C56 90 52 82 51 70 C54 76 60 80 67 80 C78 80 87 72 87 60 C87 44 69 33 50 12 Z"/>
+      </g>
+    </g>
+  </g>
+</svg>

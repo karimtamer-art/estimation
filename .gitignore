@@ -6,12 +6,14 @@ build/
 pubspec.lock
 
 # Generated platform folders — recreate with `flutter create .`
-android/
-ios/
-linux/
-macos/
-windows/
-web/
+# Anchored with a leading slash: unanchored, `ios/` also swallows
+# design/icons/ios/, and the committed icons would silently vanish.
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/web/
 
 # IDE
 .idea/

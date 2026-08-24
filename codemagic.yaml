@@ -18,6 +18,10 @@ definitions:
       rm -f test/widget_test.dart
       flutter pub get
 
+      # flutter create writes the template's Flutter-blue icons over every
+      # platform folder; paint the app's own back on. See design/README.md.
+      bash tool/apply_branding.sh
+
       # --- patches to generated iOS files -------------------------------
       # ios/ is recreated every build, so these cannot live in git.
       if [ -f ios/Runner.xcodeproj/project.pbxproj ]; then

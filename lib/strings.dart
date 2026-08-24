@@ -41,6 +41,7 @@ class Str {
   String get newGame => _p('New game', 'لعبة جديدة');
   String get length => _p('Length', 'الطول');
   String get players => _p('Players', 'اللاعبون');
+  String get player => _p('Player', 'لاعب');
   String get start => _p('Start', 'ابدأ');
   String get next => _p('Next', 'التالي');
   String get rounds => _p('rounds', 'جولة');

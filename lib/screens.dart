@@ -393,7 +393,7 @@ class _NameField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('${s.players} ${index + 1}', style: labelStyle(size: 10)),
+        Text('${s.player} ${index + 1}', style: labelStyle(size: 10)),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: c.draftPlayers[index],
@@ -403,7 +403,7 @@ class _NameField extends StatelessWidget {
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             counterText: '',
-            hintText: '${s.players} ${index + 1}',
+            hintText: '${s.player} ${index + 1}',
             filled: true,
             fillColor: AppColors.surface,
             contentPadding:

@@ -68,10 +68,13 @@ class _HomeShellState extends State<HomeShell> {
         if (c.takeDashPrompt()) DashWindow.show(context, c);
       });
     }
+    // The round counter belongs to a game still being played. Setup has no
+    // round yet, and a finished game has no next one.
     final showHeader =
         c.screen != Screen.setup &&
             c.screen != Screen.setupPlayers &&
-            c.screen != Screen.settings;
+            c.screen != Screen.settings &&
+            c.screen != Screen.done;
     // Over or under is only live while a round is being played.
     final showOverUnder =
         c.screen == Screen.bid || c.screen == Screen.tricks;

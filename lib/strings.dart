@@ -15,6 +15,11 @@ class Str {
   String get total => _p('total', 'المجموع');
   String get direction => _p('round', 'الجولة');
   String get risk => _p('Risk', 'ريسك');
+
+  /// The Risk as a tag, not a sentence: 1R, 2R, 3R — the level and the letter,
+  /// short enough to sit in a scoresheet cell.
+  String riskLabel(int level) => level <= 0 ? '' : '${level}R';
+
   String get over => _p('over', 'أوفر');
   String get under => _p('under', 'أندر');
   String get caller => _p('Caller', 'كولر');
@@ -29,6 +34,7 @@ class Str {
   String get length => _p('Length', 'الطول');
   String get players => _p('Players', 'اللاعبون');
   String get start => _p('Start', 'ابدأ');
+  String get next => _p('Next', 'التالي');
   String get rounds => _p('rounds', 'جولة');
   String get normal => _p('normal', 'عادية');
   String get color => _p('color', 'ألوان');

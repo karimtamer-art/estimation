@@ -220,9 +220,9 @@ class SetupScreen extends StatelessWidget {
                           fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 3),
                   Text(
-                    '${m.totalRounds} ${s.rounds} \u00b7 ${m.normalRounds} ${s.normal}'
+                    '${m.totalRounds} ${s.rounds} · ${m.normalRounds} ${s.normal}'
                     '${m.colorRounds > 0 ? ' + ${m.colorRounds} ${s.color}' : ''}'
-                    '${m.isHouse ? ' \u00b7 ${s.houseRule}' : ''}',
+                    '${m.isHouse ? ' · ${s.houseRule}' : ''}',
                     style: labelStyle(size: 10),
                   ),
                 ],
@@ -231,36 +231,93 @@ class SetupScreen extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 12),
-        Text(s.players, style: labelStyle()),
-        const SizedBox(height: 8),
-        for (var i = 0; i < c.players.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 7),
-            child: TextFormField(
-              initialValue: c.players[i],
-              maxLength: 14,
-              onChanged: (v) => c.setPlayer(i, v),
-              style: const TextStyle(fontSize: 16),
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '${s.players} ${i + 1}',
-                filled: true,
-                fillColor: AppColors.surface,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.line),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.line),
-                ),
-              ),
+        PrimaryButton(s.next, onTap: c.toPlayers),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------------ players
+
+/// Second half of setup: names only, once the length is settled. Landscape
+/// puts the four seats side by side, in the order they sit at the table.
+class PlayersScreen extends StatelessWidget {
+  final GameController c;
+  const PlayersScreen({super.key, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 32),
+      children: [
+        Text(s.players,
+            style: const TextStyle(
+                fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1)),
+        const SizedBox(height: 6),
+        Text(c.mode.label(c.arabic), style: labelStyle(color: AppColors.gold)),
+        const SizedBox(height: 20),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < c.players.length; i++) ...[
+              Expanded(child: _NameField(c: c, index: i)),
+              if (i < c.players.length - 1) const SizedBox(width: 8),
+            ],
+          ],
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: PrimaryButton(s.back,
+                  secondary: true, onTap: c.backToSetup),
+            ),
+            const SizedBox(width: 10),
+            Expanded(flex: 2, child: PrimaryButton(s.start, onTap: c.startGame)),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _NameField extends StatelessWidget {
+  final GameController c;
+  final int index;
+  const _NameField({required this.c, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${s.players} ${index + 1}', style: labelStyle(size: 10)),
+        const SizedBox(height: 6),
+        TextFormField(
+          initialValue: c.players[index],
+          maxLength: 14,
+          textAlign: TextAlign.center,
+          onChanged: (v) => c.setPlayer(index, v),
+          style: const TextStyle(fontSize: 16),
+          decoration: InputDecoration(
+            counterText: '',
+            hintText: '${s.players} ${index + 1}',
+            filled: true,
+            fillColor: AppColors.surface,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.line),
             ),
           ),
-        const SizedBox(height: 12),
-        PrimaryButton(s.start, onTap: c.startGame),
+        ),
       ],
     );
   }
@@ -312,13 +369,12 @@ class EntryScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 StatBar(c: c, isBid: isBid),
                 if (err != null) Banner_(err, warn: true),
-                Scoreboard(c: c),
               ],
             ),
           ),
           const SizedBox(width: 14),
           SizedBox(
-            width: 210,
+            width: 250,
             child: ListView(
               padding: const EdgeInsets.only(bottom: 12),
               children: [
@@ -342,6 +398,9 @@ class EntryScreen extends StatelessWidget {
                   secondary: true,
                   onTap: isBid ? c.skipRound : c.backToBids,
                 ),
+                // The running sheet sits beside the seats, not under them, so
+                // the table can be read before anyone commits to a number.
+                Scoreboard(c: c),
               ],
             ),
           ),
@@ -353,6 +412,9 @@ class EntryScreen extends StatelessWidget {
 
 // ------------------------------------------------------------------- result
 
+/// After a round is scored: the running sheet for every round played, not a
+/// breakdown of the round just finished. Continue stays pinned so a long sheet
+/// never buries it.
 class ResultScreen extends StatelessWidget {
   final GameController c;
   const ResultScreen({super.key, required this.c});
@@ -360,76 +422,19 @@ class ResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = c.s;
-    final idx = c.resultIndex.clamp(0, c.rounds.length - 1);
-    final r = c.rounds.isEmpty ? null : c.rounds[idx];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 32),
-      children: [
-        for (var i = 0; i < c.playerCount; i++)
-          _breakdown(i, r == null || i >= r.scores.length ? 0 : r.scores[i],
-              r == null || r.lines.length <= i ? const <ScoreLine>[] : r.lines[i]),
-        if (c.lastMessage != null) Banner_(c.lastMessage!),
-        const SizedBox(height: 14),
-        PrimaryButton(s.continue_, onTap: c.continueAfterResult),
-        Scoreboard(c: c),
-      ],
-    );
-  }
-
-  Widget _breakdown(int i, int value, List<ScoreLine> lines) {
-    final color = value > 0
-        ? AppColors.green
-        : value < 0
-            ? AppColors.red
-            : AppColors.dim;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(c.players[i],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-              Text(value > 0 ? '+$value' : '$value',
-                  style: numberStyle(size: 24, color: color)),
-            ],
-          ),
-          for (final l in lines)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(l.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontFamily: kMono,
-                            fontSize: 11,
-                            color: AppColors.dim)),
-                  ),
-                  Text(l.value > 0 ? '+${l.value}' : '${l.value}',
-                      style: const TextStyle(
-                          fontFamily: kMono,
-                          fontSize: 11,
-                          color: AppColors.dim)),
-                ],
-              ),
+          if (c.lastMessage != null) Banner_(c.lastMessage!),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [Scoreboard(c: c)],
             ),
+          ),
+          PrimaryButton(s.continue_, onTap: c.continueAfterResult),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'controller.dart';
 import 'models.dart';
+import 'scoring.dart';
 import 'theme.dart';
 
 /// One player's column: name, +, value, −, role tags, dash toggle.
@@ -33,10 +34,11 @@ class SeatColumn extends StatelessWidget {
       badge = d.callerOrWith.where((x) => x).length > 1 ? s.with_ : s.caller;
     }
 
-    final riskTag = (isBid && index == d.riskIndex && d.riskLevel > 0)
-        ? '${s.risk} \u00d7${d.riskLevel}'
+    final riskTag = (index == d.riskIndex && d.riskLevel > 0)
+        ? s.riskLabel(d.riskLevel)
         : null;
 
+    final totals = c.totals;
     // Crown to the outright leader, koz to the outright last place.
     final crown = c.leaderIndex == index;
     final koz = c.laggardIndex == index;
@@ -67,6 +69,21 @@ class SeatColumn extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          ),
+          // Running total, right under the name: what this seat is playing
+          // from, readable without scrolling down to the sheet.
+          Text(
+            '${s.total.toUpperCase()} ${totals[index]}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: kMono,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: crown
+                  ? AppColors.gold
+                  : (koz ? AppColors.red : AppColors.dim),
+            ),
           ),
           const SizedBox(height: 6),
           _StepButton(
@@ -149,15 +166,27 @@ class SeatColumn extends StatelessWidget {
                   ),
           ),
 
+          // The Risk badge: who carries it, and whether it is a plain or a
+          // double risk. Stays up through the tricks — it is still theirs.
           SizedBox(
-            height: 14,
-            child: Text(
-              riskTag ?? '',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: labelStyle(size: 10, color: AppColors.gold),
-            ),
+            height: 20,
+            child: riskTag == null
+                ? null
+                : Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.red.withOpacity(0.16),
+                      border: Border.all(color: AppColors.red),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Text(
+                      '⚠ ${riskTag.toUpperCase()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: labelStyle(size: 9, color: AppColors.red),
+                    ),
+                  ),
           ),
           if (isBid) ...[
             const SizedBox(height: 5),
@@ -387,11 +416,14 @@ class StatBar extends StatelessWidget {
     final s = c.s;
     final d = c.derived;
     final shown = isBid ? d.total : c.trickSum;
+    final ou = OverUnder.of(c);
+    final hasRisk = d.riskLevel > 0 && d.riskIndex >= 0;
     final bad = isBid
         ? (c.bidsComplete && d.total == c.rules.tricks)
         : (c.tricksComplete && c.trickSum != c.rules.tricks);
 
-    Widget cell(String label, String value, Color color) => Expanded(
+    Widget cell(String label, String value, Color color, {double size = 18}) =>
+        Expanded(
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
             decoration: BoxDecoration(
@@ -405,7 +437,7 @@ class StatBar extends StatelessWidget {
                 Text(value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: numberStyle(size: 18, color: color)),
+                    style: numberStyle(size: size, color: color)),
               ],
             ),
           ),
@@ -415,11 +447,73 @@ class StatBar extends StatelessWidget {
       children: [
         cell(s.total, '$shown', bad ? AppColors.red : AppColors.text),
         const SizedBox(width: 8),
-        cell(s.direction, d.over ? s.over : s.under, AppColors.text),
+        cell(s.direction, ou.full.toUpperCase(), ou.color, size: 16),
         const SizedBox(width: 8),
-        cell(s.risk, d.riskLevel > 0 ? '\u00d7${d.riskLevel}' : '\u2014',
-            d.riskLevel > 0 ? AppColors.gold : AppColors.dim),
+        // Risk cell: the seat carrying it up top, what they are carrying below.
+        cell(
+          hasRisk ? c.players[d.riskIndex].toUpperCase() : s.risk,
+          hasRisk ? s.riskLabel(d.riskLevel).toUpperCase() : '—',
+          hasRisk ? AppColors.red : AppColors.dim,
+        ),
       ],
+    );
+  }
+}
+
+/// Where the table stands against 13 — over, under, and by how much. The
+/// direction is live while estimating and stays pinned while the tricks come
+/// in, since it is what a dash gets paid on.
+class OverUnder {
+  final String word;
+  final String amount;
+  final Color color;
+  const OverUnder(this.word, this.amount, this.color);
+
+  factory OverUnder.of(GameController c) {
+    final s = c.s;
+    final diff = c.callDiff;
+    if (!c.anyBidEntered) {
+      return const OverUnder('—', '', AppColors.dim);
+    }
+    if (diff == 0) {
+      // Exactly 13 is not a legal table; flag it rather than pick a side.
+      return OverUnder('=${c.rules.tricks}', '', AppColors.red);
+    }
+    return diff > 0
+        ? OverUnder(s.over, '+$diff', AppColors.gold)
+        : OverUnder(s.under, '-${-diff}', AppColors.green);
+  }
+
+  String get full => amount.isEmpty ? word : '$word $amount';
+}
+
+/// Compact over/under badge for the top bar, so the call is readable from
+/// across the table without hunting for the stat row.
+class OverUnderPill extends StatelessWidget {
+  final GameController c;
+  const OverUnderPill({super.key, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final ou = OverUnder.of(c);
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: ou.color.withOpacity(0.16),
+        border: Border.all(color: ou.color.withOpacity(0.55)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        ou.full.toUpperCase(),
+        style: TextStyle(
+          fontFamily: kMono,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+          color: ou.color,
+        ),
+      ),
     );
   }
 }
@@ -539,6 +633,8 @@ class Scoreboard extends StatelessWidget {
 
   Widget _row(BuildContext context, int i) {
     final r = c.rounds[i];
+    // Who carried the Risk that round, and how heavy it was.
+    final d = derive(r, c.rules);
     return InkWell(
       onTap: () => c.editRound(i),
       child: Padding(
@@ -582,11 +678,10 @@ class Scoreboard extends StatelessWidget {
                         color: _scoreColor(r, k),
                       ),
                     ),
-                    Text(
-                      _detailText(r, k),
-                      style: const TextStyle(
-                          fontFamily: kMono, fontSize: 9, color: AppColors.faint),
-                    ),
+                    _detail(r, k,
+                        risk: (!r.skipped && d.riskIndex == k && d.riskLevel > 0)
+                            ? c.s.riskLabel(d.riskLevel)
+                            : null),
                   ],
                 ),
               ),
@@ -610,9 +705,28 @@ class Scoreboard extends StatelessWidget {
     return AppColors.dim;
   }
 
-  String _detailText(Round r, int k) {
-    if (r.skipped) return '\u2014';
+  /// Estimate → tricks for one seat, with the Risk tag (1R / 2R) appended in
+  /// red when that seat carried it.
+  Widget _detail(Round r, int k, {String? risk}) {
+    const base =
+        TextStyle(fontFamily: kMono, fontSize: 9, color: AppColors.faint);
+    if (r.skipped) return const Text('—', style: base);
     final bid = r.dash[k] ? 'dash' : '${r.bids[k] ?? '-'}';
-    return '$bid\u2192${r.tricks[k] ?? '-'}';
+    return Text.rich(
+      TextSpan(
+        style: base,
+        children: [
+          TextSpan(text: '$bid→${r.tricks[k] ?? '-'}'),
+          if (risk != null)
+            TextSpan(
+              text: ' $risk',
+              style: const TextStyle(
+                  color: AppColors.red, fontWeight: FontWeight.w700),
+            ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }

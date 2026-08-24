@@ -5,6 +5,7 @@ import 'controller.dart';
 import 'models.dart';
 import 'screens.dart';
 import 'theme.dart';
+import 'widgets.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,7 +52,12 @@ class HomeShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = c.s;
     final showHeader =
-        c.screen != Screen.setup && c.screen != Screen.settings;
+        c.screen != Screen.setup &&
+            c.screen != Screen.setupPlayers &&
+            c.screen != Screen.settings;
+    // Over or under is only live while a round is being played.
+    final showOverUnder =
+        c.screen == Screen.bid || c.screen == Screen.tricks;
 
     // Home carries its own language button and needs the full frame.
     if (c.screen == Screen.home) {
@@ -79,6 +85,7 @@ class HomeShell extends StatelessWidget {
                               )
                             : const SizedBox.shrink(),
                       ),
+                      if (showOverUnder) OverUnderPill(c: c),
                       if (showHeader && c.currentMult > 1)
                         Container(
                           margin: const EdgeInsets.only(right: 8),
@@ -126,6 +133,8 @@ class HomeShell extends StatelessWidget {
         return HomeScreen(c: c);
       case Screen.setup:
         return SetupScreen(c: c);
+      case Screen.setupPlayers:
+        return PlayersScreen(c: c);
       case Screen.bid:
       case Screen.tricks:
         return EntryScreen(c: c);

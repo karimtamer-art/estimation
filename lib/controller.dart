@@ -8,7 +8,7 @@ import 'rules.dart';
 import 'scoring.dart';
 import 'strings.dart';
 
-enum Screen { home, setup, bid, tricks, result, done, settings }
+enum Screen { home, setup, bid, tricks, result, done, settings, setupPlayers }
 
 const _kStoreKey = 'estimation_state_v1';
 
@@ -73,6 +73,19 @@ class GameController extends ChangeNotifier {
   int get trickSum =>
       working.tricks.fold<int>(0, (a, b) => a + (b ?? 0));
 
+  /// How far the table's estimates sit from 13. Positive is over, negative is
+  /// under, zero is the illegal exact-13 table.
+  int get callDiff => derived.total - rules.tricks;
+
+  /// True once at least one seat has settled, so over/under means something.
+  /// Before that the table is trivially "under" by 13 and saying so is noise.
+  bool get anyBidEntered {
+    for (var i = 0; i < working.bids.length; i++) {
+      if (working.dash[i] || working.bids[i] != null) return true;
+    }
+    return false;
+  }
+
   bool get allEqualEstimates {
     if (!rules.houseAllEqualDouble || !bidsComplete) return false;
     final live = <int>[];
@@ -134,8 +147,22 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
-  /// Home -> player and length setup.
+  /// Home -> length setup. Names come after, on their own screen.
   void toSetup() {
+    screen = Screen.setup;
+    notifyListeners();
+    _save();
+  }
+
+  /// Length picked -> name the seats.
+  void toPlayers() {
+    screen = Screen.setupPlayers;
+    notifyListeners();
+    _save();
+  }
+
+  /// Back from names to the length picker.
+  void backToSetup() {
     screen = Screen.setup;
     notifyListeners();
     _save();

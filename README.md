@@ -1,4 +1,4 @@
-# Estimation — scorekeeper
+# Estimation Calculator
 
 Flutter port of the Estimation (تقدير) scoresheet. Pocket/Egyptian ruleset,
 offline, no backend.

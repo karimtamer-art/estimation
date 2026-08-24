@@ -64,4 +64,21 @@ void main() {
     expect(find.text('+'), findsNWidgets(4));
     expect(find.text('−'), findsNWidgets(4));
   });
+  testWidgets('the home wordmark fits, both languages', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    t.view.physicalSize = const Size(1600, 720);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+
+    final c = GameController();
+    // The whole app, so toggling the language actually rebuilds the shell.
+    await t.pumpWidget(EstimationApp(controller: c));
+    await t.pumpAndSettle();
+    expect(find.text('Estimation'), findsOneWidget);
+    expect(find.text('Calculator'), findsOneWidget);
+
+    c.toggleLanguage();
+    await t.pumpAndSettle();
+    expect(find.text('حاسبة'), findsOneWidget);
+  });
 }

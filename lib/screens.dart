@@ -119,6 +119,16 @@ class HomeScreen extends StatelessWidget {
                           height: 1,
                         ),
                       ),
+                      Text(
+                        s.appSubName,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.5,
+                          height: 1.25,
+                          color: AppColors.gold,
+                        ),
+                      ),
                       const SizedBox(height: 10),
                       Container(width: 60, height: 3, color: AppColors.gold),
                       const SizedBox(height: 12),

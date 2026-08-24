@@ -5,7 +5,11 @@ class Str {
 
   String _p(String en, String a) => ar ? a : en;
 
+  /// The wordmark is two lines: the game, then what this app does with it.
+  /// The icon keeps the short line alone — iOS clips a label past about a
+  /// dozen characters.
   String get appName => _p('Estimation', 'إستيميشن');
+  String get appSubName => _p('Calculator', 'حاسبة');
   String get round => _p('Round', 'جولة');
   String get of => _p('of', 'من');
   String get estimate => _p('estimate', 'التقدير');

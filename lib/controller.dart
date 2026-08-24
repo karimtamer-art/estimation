@@ -182,6 +182,9 @@ class GameController extends ChangeNotifier {
   }
 
   void goHome() {
+    // Remember what was left running, so Home still offers to go back into it
+    // even before a single round has been scored.
+    _resumeTarget = _resumableFrom(screen) ?? _resumeTarget;
     screen = Screen.home;
     notifyListeners();
     _save();
@@ -212,14 +215,43 @@ class GameController extends ChangeNotifier {
 
   /// True once a game is under way, so Home can offer to resume it.
   bool get hasGameInProgress =>
-      rounds.isNotEmpty || screen == Screen.bid || screen == Screen.tricks;
+      rounds.isNotEmpty ||
+      _resumeTarget != null ||
+      screen == Screen.bid ||
+      screen == Screen.tricks;
 
   /// Back into a game already in progress, at whichever half of the round was
-  /// left unfinished.
+  /// left unfinished — or at the screen it was left on, when that screen is
+  /// where the game actually stands.
   void resumeGame() {
-    screen = bidsComplete ? Screen.tricks : Screen.bid;
+    final target = _resumeTarget;
+    _resumeTarget = null;
+    if (target == Screen.result || target == Screen.done) {
+      screen = target!;
+    } else {
+      screen = bidsComplete ? Screen.tricks : Screen.bid;
+    }
     notifyListeners();
     _save();
+  }
+
+  /// Where Resume goes. Set when the table steps away from a live game —
+  /// pressing Home, or closing the app — and cleared once they step back in.
+  Screen? _resumeTarget;
+
+  /// Which screen a game left mid-flight should come back to, or null when
+  /// [s] is not part of a game in progress.
+  static Screen? _resumableFrom(Screen s) {
+    switch (s) {
+      case Screen.bid:
+      case Screen.tricks:
+        return Screen.bid; // resumeGame picks the right half of the round
+      case Screen.result:
+      case Screen.done:
+        return s;
+      default:
+        return null;
+    }
   }
 
   // ----------------------------------------------------------------- actions
@@ -476,6 +508,7 @@ class GameController extends ChangeNotifier {
 
   void newGame() {
     draftPlayers = List<String>.filled(playerCount, '');
+    _resumeTarget = null;
     rounds = [];
     editingIndex = null;
     pendingMult = 1;
@@ -524,10 +557,20 @@ class GameController extends ChangeNotifier {
                 ?.map((e) => Round.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [];
-        screen = Screen.values[(j['screen'] as num?)?.toInt() ?? Screen.setup.index];
-        if (screen == Screen.settings || screen == Screen.result) {
-          screen = rounds.isEmpty ? Screen.setup : Screen.bid;
-        }
+        // The app always comes back on Home. Reopening it — or the tab —
+        // should not drop the table straight into a round nobody asked for;
+        // what was running waits behind Resume instead.
+        //
+        // It also matters for the round that was already scored: coming back
+        // into its estimates would let the same round be committed twice.
+        final stored =
+            Screen.values[(j['screen'] as num?)?.toInt() ?? Screen.home.index];
+        _resumeTarget = _resumableFrom(stored) ??
+            (j['resume'] == null
+                ? null
+                : _resumableFrom(
+                    Screen.values[(j['resume'] as num).toInt()]));
+        screen = Screen.home;
         final w = j['working'];
         working = w == null
             ? Round.empty(players.length)
@@ -558,6 +601,7 @@ class GameController extends ChangeNotifier {
           'rounds': rounds.map((r) => r.toJson()).toList(),
           'working': working.toJson(),
           'screen': screen.index,
+          'resume': _resumeTarget?.index,
         }),
       );
     } catch (_) {

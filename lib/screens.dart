@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'build_info.dart';
 import 'controller.dart';
 import 'models.dart';
 import 'theme.dart';
@@ -133,6 +134,12 @@ class HomeScreen extends StatelessWidget {
                       Container(width: 60, height: 3, color: AppColors.gold),
                       const SizedBox(height: 12),
                       Text(s.tagline, style: labelStyle(size: 11)),
+                      const SizedBox(height: 6),
+                      // Which build this is. Every build says 1.0.0, so this
+                      // is the only way to tell a fresh install from the one
+                      // already on the phone.
+                      Text('build $kBuildLabel',
+                          style: labelStyle(size: 9, color: AppColors.faint)),
                     ],
                   ),
                 ),

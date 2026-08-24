@@ -127,8 +127,13 @@ workflows:
           set -e
           # App Store Connect rejects a build number it has already seen, so
           # never ship the +1 hard-coded in pubspec.yaml.
+          #
+          # BUILD_LABEL is printed on the app's home screen. Every build calls
+          # itself 1.0.0, so without it there is no way to tell a fresh
+          # TestFlight install from the copy already on the phone.
           flutter build ipa --release \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=BUILD_LABEL="$BUILD_NUMBER-$(git rev-parse --short HEAD)" \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
@@ -173,7 +178,8 @@ workflows:
       - *test
       - name: Build APK
         script: |
-          flutter build apk --release --build-number="$BUILD_NUMBER"
+          flutter build apk --release --build-number="$BUILD_NUMBER" \
+            --dart-define=BUILD_LABEL="$BUILD_NUMBER-$(git rev-parse --short HEAD)"
 
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
@@ -195,7 +201,8 @@ workflows:
       - *test
       - name: Build web
         script: |
-          flutter build web --release
+          flutter build web --release \
+            --dart-define=BUILD_LABEL="cm-$BUILD_NUMBER-$(git rev-parse --short HEAD)"
 
     artifacts:
       - build/web/**

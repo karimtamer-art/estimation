@@ -47,8 +47,12 @@ jobs:
           flutter test
 
       # Pages serves the repo at /estimation/, so the app has to be told.
+      # BUILD_LABEL lands on the app's home screen: every build calls itself
+      # 1.0.0, so it is the only way to tell which one is on screen.
       - name: Build web
-        run: flutter build web --release --base-href /estimation/
+        run: |
+          flutter build web --release --base-href /estimation/ \
+            --dart-define=BUILD_LABEL="web-${GITHUB_SHA::7}"
 
       # Pages has to be switched on by hand, once, in
       # Settings -> Pages -> Build and deployment -> Source: GitHub Actions.

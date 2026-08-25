@@ -241,8 +241,9 @@ class SetupScreen extends StatelessWidget {
   }
 }
 
-/// One length, in its own colour. The previously chosen length keeps a
-/// brighter border so a returning table can see where it left off.
+/// One length as a glossy, saturated button. The chosen length lights up —
+/// full brightness, a white rim and a glow in its own colour — so a returning
+/// table can see where it left off from across the room.
 class _ModeCard extends StatelessWidget {
   final GameController c;
   final GameMode mode;
@@ -251,65 +252,156 @@ class _ModeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = c.s;
-    final accent = mode.accent;
     final current = c.mode == mode;
-    final radius = BorderRadius.circular(14);
-    return Material(
-      color: Color.alphaBlend(
-          accent.withOpacity(current ? 0.20 : 0.09), AppColors.surface),
-      borderRadius: radius,
-      child: InkWell(
-        borderRadius: radius,
-        splashColor: accent.withOpacity(0.22),
-        onTap: () => c.chooseMode(mode),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+    final radius = BorderRadius.circular(16);
+    const fast = Duration(milliseconds: 170);
+    return AnimatedScale(
+      scale: current ? 1 : 0.965,
+      duration: fast,
+      curve: Curves.easeOut,
+      child: AnimatedOpacity(
+        opacity: current ? 1 : 0.84,
+        duration: fast,
+        child: AnimatedContainer(
+          duration: fast,
+          curve: Curves.easeOut,
           decoration: BoxDecoration(
             borderRadius: radius,
-            border: Border.all(
-              color: accent.withOpacity(current ? 1 : 0.45),
-              width: current ? 2 : 1.4,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [mode.faceHi, mode.faceLo],
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                mode.label(c.arabic),
-                style: TextStyle(
-                    fontSize: 22, fontWeight: FontWeight.w700, color: accent),
+            border: Border.all(
+              color: current ? Colors.white.withOpacity(0.9) : mode.faceRim,
+              width: 2,
+            ),
+            boxShadow: [
+              // The length's own colour, thrown on the background as a glow.
+              BoxShadow(
+                color: mode.faceLo.withOpacity(current ? 0.55 : 0.22),
+                blurRadius: current ? 24 : 10,
+                spreadRadius: current ? 1 : 0,
+                offset: Offset(0, current ? 8 : 4),
               ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text('${mode.totalRounds}',
-                      style: numberStyle(
-                          color: accent, size: 34, weight: FontWeight.w700)),
-                  const SizedBox(width: 6),
-                  Text(s.rounds, style: labelStyle(size: 10)),
-                ],
+              BoxShadow(
+                color: Colors.black.withOpacity(0.38),
+                blurRadius: 9,
+                offset: const Offset(0, 3),
               ),
-              const SizedBox(height: 12),
-              _ModeLine(text: '${mode.normalRounds} ${s.normal}', dot: accent),
-              if (mode.colorRounds > 0) ...[
-                const SizedBox(height: 5),
-                _ModeLine(text: '${mode.colorRounds} ${s.color}', dot: accent),
-              ],
-              const Spacer(),
-              if (mode.isHouse)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: accent.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(s.houseRule,
-                      style: labelStyle(size: 9, color: accent)),
-                ),
             ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: radius,
+              splashColor: Colors.white.withOpacity(0.20),
+              highlightColor: Colors.white.withOpacity(0.08),
+              onTap: () => c.chooseMode(mode),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: Stack(
+                  children: [
+                    // A glossy upper half that breaks on a hard line halfway
+                    // down, then shadow pooling at the foot: the two halves of
+                    // a moulded plastic button.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0, 0.47, 0.475, 1],
+                            colors: [
+                              Colors.white.withOpacity(0.34),
+                              Colors.white.withOpacity(0.10),
+                              Colors.white.withOpacity(0),
+                              Colors.black.withOpacity(0.18),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Hairline bevel just inside the rim.
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.22),
+                              width: 1.2),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mode.label(c.arabic).toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              color: Colors.white,
+                              shadows: _facePress,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '${mode.totalRounds}',
+                                style: const TextStyle(
+                                  fontFamily: kMono,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1,
+                                  color: Colors.white,
+                                  shadows: _facePress,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(s.rounds,
+                                  style: labelStyle(
+                                      size: 10,
+                                      color: Colors.white.withOpacity(0.78))),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          _ModeLine(text: '${mode.normalRounds} ${s.normal}'),
+                          if (mode.colorRounds > 0) ...[
+                            const SizedBox(height: 5),
+                            _ModeLine(text: '${mode.colorRounds} ${s.color}'),
+                          ],
+                          const Spacer(),
+                          if (mode.isHouse)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.26),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.22)),
+                              ),
+                              child: Text(s.houseRule.toUpperCase(),
+                                  style: labelStyle(
+                                      size: 9,
+                                      color: Colors.white.withOpacity(0.92))),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -317,11 +409,15 @@ class _ModeCard extends StatelessWidget {
   }
 }
 
-/// A bullet in the length's own colour, then the breakdown it describes.
+/// Text pressed into the button face rather than sitting on top of it.
+const List<Shadow> _facePress = [
+  Shadow(color: Color(0x59000000), offset: Offset(0, 2), blurRadius: 3),
+];
+
+/// A white bullet on the button face, then the breakdown it describes.
 class _ModeLine extends StatelessWidget {
   final String text;
-  final Color dot;
-  const _ModeLine({required this.text, required this.dot});
+  const _ModeLine({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -330,14 +426,18 @@ class _ModeLine extends StatelessWidget {
         Container(
           width: 5,
           height: 5,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 7),
         Flexible(
           child: Text(text,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: labelStyle(size: 10, color: AppColors.text)),
+              style:
+                  labelStyle(size: 10, color: Colors.white.withOpacity(0.92))),
         ),
       ],
     );
@@ -377,11 +477,12 @@ class PlayersScreen extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: PrimaryButton(s.back,
-                  secondary: true, onTap: c.backToSetup),
+              child:
+                  PrimaryButton(s.back, secondary: true, onTap: c.backToSetup),
             ),
             const SizedBox(width: 10),
-            Expanded(flex: 2, child: PrimaryButton(s.start, onTap: c.startGame)),
+            Expanded(
+                flex: 2, child: PrimaryButton(s.start, onTap: c.startGame)),
           ],
         ),
       ],
@@ -462,18 +563,17 @@ class EntryScreen extends StatelessWidget {
                         style: labelStyle(color: AppColors.gold)),
                   ),
                 Text(isBid ? s.estimate : s.tricksWon, style: labelStyle()),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     for (var i = 0; i < c.playerCount; i++) ...[
-                      Expanded(
-                          child: SeatColumn(c: c, index: i, isBid: isBid)),
+                      Expanded(child: SeatColumn(c: c, index: i, isBid: isBid)),
                       if (i < c.playerCount - 1) const SizedBox(width: 6),
                     ],
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 StatBar(c: c, isBid: isBid),
                 if (err != null) Banner_(err, warn: true),
               ],
@@ -485,7 +585,15 @@ class EntryScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 12),
               children: [
-                if (isBid && c.lockedTrump == null) ...[
+                if (isBid) ...[
+                  StepStrip(c: c),
+                  const SizedBox(height: 12),
+                ],
+                // The trump is the caller's to pick, so the suits only come
+                // out once the table has said whose call it is.
+                if (isBid &&
+                    c.lockedTrump == null &&
+                    c.working.caller != null) ...[
                   Text(s.trump, style: labelStyle()),
                   const SizedBox(height: 8),
                   TrumpRow(c: c),
@@ -505,9 +613,8 @@ class EntryScreen extends StatelessWidget {
                   secondary: true,
                   onTap: isBid ? c.skipRound : c.backToBids,
                 ),
-                // The running sheet sits beside the seats, not under them, so
-                // the table can be read before anyone commits to a number.
-                Scoreboard(c: c),
+                // No sheet down here any more: it lives behind the tab at the
+                // top of the screen, where it can have the whole width.
               ],
             ),
           ),
@@ -731,6 +838,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             r.superCallMin, (v) => r.superCallMin = v),
         _bool('Nobody made it \u2192 round scores 0', '', r.allMissZero,
             (v) => r.allMissZero = v),
+        _num('All passed \u2192 next round worth',
+            'passing again holds here', r.passMult,
+            (v) => r.passMult = v),
+        _num('Nobody made it \u2192 multiply by',
+            'stacks: \u00d72, \u00d74, \u00d78', r.missMultiply,
+            (v) => r.missMultiply = v),
+        _bool('Shared top call \u2192 double',
+            'three or more seats on the highest call',
+            r.sameHighestCallDouble, (v) => r.sameHighestCallDouble = v),
+        _num('Seats sharing the top call', '', r.sameHighestCallMin,
+            (v) => r.sameHighestCallMin = v),
+        _num('Shared top call multiplier', '', r.sameHighestCallMult,
+            (v) => r.sameHighestCallMult = v),
+        _bool('Shared top call: Color rounds only', '',
+            r.sameHighestCallColorOnly,
+            (v) => r.sameHighestCallColorOnly = v),
+        _bool('Shared top call stacks',
+            'on: \u00d72 over a running \u00d72 is \u00d74',
+            r.sameHighestCallStacks, (v) => r.sameHighestCallStacks = v),
+        _suits('Shared top call: trumps', r.sameHighestCallSuits),
         _bool('House: all equal \u2192 double + re-estimate', '',
             r.houseAllEqualDouble, (v) => r.houseAllEqualDouble = v),
         const SizedBox(height: 20),
@@ -738,12 +865,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Expanded(child: PrimaryButton(s.done, onTap: c.closeSettings)),
             const SizedBox(width: 8),
-            PrimaryButton(s.defaults,
-                secondary: true,
-                onTap: () {
-                  c.resetRules();
-                  setState(() {});
-                }),
+            PrimaryButton(s.defaults, secondary: true, onTap: () {
+              c.resetRules();
+              setState(() {});
+            }),
           ],
         ),
       ],
@@ -754,6 +879,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.only(top: 22, bottom: 4),
         child: Text(label, style: labelStyle(color: AppColors.gold)),
       );
+
+  /// Which trumps a rule is played under, as a row of suits to switch on and
+  /// off — the Color rounds run sun, spades, hearts, diamonds, clubs.
+  Widget _suits(String label, List<Suit> selected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _label(label, '')),
+          for (final su in Suit.values) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () {
+                selected.contains(su)
+                    ? selected.remove(su)
+                    : selected.add(su);
+                widget.c.ruleChanged();
+                setState(() {});
+              },
+              child: Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected.contains(su)
+                      ? AppColors.gold
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Text(
+                  su.symbol,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: selected.contains(su)
+                        ? AppColors.onGold
+                        : (su.isRed ? AppColors.red : AppColors.text),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _num(String label, String hint, int value, void Function(int) set) {
     return Container(
@@ -799,8 +973,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _bool(
-      String label, String hint, bool value, void Function(bool) set) {
+  Widget _bool(String label, String hint, bool value, void Function(bool) set) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 5),
       decoration: const BoxDecoration(

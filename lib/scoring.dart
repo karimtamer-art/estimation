@@ -149,6 +149,49 @@ RoundResult scoreRound(Round r, Rules rules, Str s) {
   return RoundResult(scores, lines, allMissed, d);
 }
 
+/// Three or more seats sharing the HIGHEST call on the table — the Egyptian
+/// Color-round rule that doubles the hand.
+///
+/// It is about the top of the table being shared, not about matching numbers
+/// anywhere on it and not about what the estimates total:
+///
+///   [4, 4, 4, 3] -> yes, three seats hold the top call of 4
+///   [3, 3, 3, 2] -> yes
+///   [6, 2, 2, 2] -> no, the top call of 6 is held alone
+///   [3, 3, 3, 5] -> no, the top call of 5 is held alone
+///   [5, 5, 3, 2] -> no, only two seats hold the top
+///
+/// A dashed seat called nothing, so it is not counted either way. [trump] is
+/// passed in rather than read off the round, because the estimate screen asks
+/// this question while the round is still being called.
+bool sameHighestCall(
+  Round r,
+  Rules rules, {
+  required bool isColorRound,
+  required Suit? trump,
+}) {
+  if (!rules.sameHighestCallDouble) return false;
+  if (rules.sameHighestCallColorOnly && !isColorRound) return false;
+  if (trump == null || !rules.sameHighestCallSuits.contains(trump)) {
+    return false;
+  }
+
+  int? top;
+  var sharing = 0;
+  for (var i = 0; i < r.bids.length; i++) {
+    if (r.dash[i]) continue;
+    final b = r.bids[i];
+    if (b == null) continue;
+    if (top == null || b > top) {
+      top = b;
+      sharing = 1;
+    } else if (b == top) {
+      sharing++;
+    }
+  }
+  return top != null && sharing >= rules.sameHighestCallMin;
+}
+
 class ChainResult {
   /// Multiplier the next round starts at (sa'aydeh carry).
   final int pendingMult;
@@ -160,16 +203,56 @@ class ChainResult {
 
 /// Rescores the whole game in order. Multipliers depend on history, so editing
 /// round 4 correctly rebuilds rounds 5 onward.
-ChainResult recomputeAll(List<Round> rounds, Rules rules, int n, Str s) {
+///
+/// Sa'aydeh, the two ways a round carries into the next one:
+///   * the table passed — the next round is worth [Rules.passMult], and
+///     passing again leaves it there rather than stacking;
+///   * nobody made their bid — whatever is already on the table is multiplied
+///     by [Rules.missMultiply], so 1 becomes 2, 2 becomes 4, and on up.
+/// Any round somebody wins puts it back to face value.
+ChainResult recomputeAll(
+  List<Round> rounds,
+  Rules rules,
+  int n,
+  Str s, {
+  /// Needed to know which rounds are the fixed-trump Color ones.
+  GameMode mode = GameMode.full,
+}) {
+  // What the round being walked over is worth, carried from the ones behind
+  // it. Never below face value, whatever the rules were edited to.
+  var pending = 1;
   var streak = 0;
+  final grow = rules.missMultiply < 1 ? 1 : rules.missMultiply;
+  final pass = rules.passMult < 1 ? 1 : rules.passMult;
+
+  // Color rounds are counted off the rounds actually played, the same way the
+  // rest of the app counts them: a round nobody played takes no Color slot.
+  var played = 0;
+
   for (final r in rounds) {
-    final base =
-        streak > 0 ? rules.ladder[(streak - 1).clamp(0, rules.ladder.length - 1)] : 1;
-    r.mult = base * r.houseMult;
+    var roundMult = pending * r.houseMult;
+    if (!r.skipped &&
+        sameHighestCall(r, rules,
+            isColorRound: mode.fixedTrump(played) != null,
+            trump: r.trump)) {
+      // Stacking is configured, never assumed: on, the double lands on top of
+      // whatever the round was already worth; off, it only lifts a round that
+      // was not already worth that much.
+      final doubled = rules.sameHighestCallMult < 1
+          ? roundMult
+          : (rules.sameHighestCallStacks
+              ? roundMult * rules.sameHighestCallMult
+              : (roundMult < rules.sameHighestCallMult
+                  ? rules.sameHighestCallMult
+                  : roundMult));
+      roundMult = doubled;
+    }
+    r.mult = roundMult;
 
     if (r.skipped) {
       r.scores = List<int>.filled(n, 0);
       r.lines = List<List<ScoreLine>>.generate(n, (_) => const []);
+      if (pending < pass) pending = pass;
       streak++;
       continue;
     }
@@ -177,10 +260,15 @@ ChainResult recomputeAll(List<Round> rounds, Rules rules, int n, Str s) {
     final out = scoreRound(r, rules, s);
     r.scores = out.scores;
     r.lines = out.lines;
-    streak = out.allMissed ? streak + 1 : 0;
+    if (out.allMissed) {
+      pending *= grow;
+      streak++;
+    } else {
+      pending = 1;
+      streak = 0;
+    }
+    played++;
   }
 
-  final pending =
-      streak > 0 ? rules.ladder[(streak - 1).clamp(0, rules.ladder.length - 1)] : 1;
   return ChainResult(pending, streak);
 }

@@ -6,6 +6,7 @@ import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
 import 'package:estimation/theme.dart';
+import 'package:estimation/widgets.dart';
 
 /// A phone held sideways, which is the only way this app is used. An overflow
 /// anywhere in the seat column fails these outright.
@@ -22,40 +23,98 @@ Future<GameController> pumpEntry(WidgetTester t, Screen screen) async {
     c.working.bids = [5, 4, 3, 3];
     c.working.tricks = List<int?>.filled(4, null);
   }
-  await t.pumpWidget(MaterialApp(theme: buildTheme(), home: HomeShell(c: c)));
+  // The shell listens to the controller the way the real app does, so a press
+  // that changes the round is followed by the rebuild it causes.
+  await t.pumpWidget(MaterialApp(
+    theme: buildTheme(),
+    home: AnimatedBuilder(
+      animation: c,
+      builder: (_, __) => HomeShell(c: c),
+    ),
+  ));
   await t.pumpAndSettle();
   return c;
 }
 
 void main() {
-  testWidgets('estimating: no steppers, and the number opens the pad',
+  testWidgets('the call panel settles the caller, the trump and the number',
       (t) async {
     final c = await pumpEntry(t, Screen.bid);
 
-    // The +/- pair is gone from the estimate screen.
+    // The +/- pair is gone from the estimate screen, and so is the pad that
+    // used to open off the number: a seat speaks through its buttons now.
     expect(find.text('+'), findsNothing);
     expect(find.text('−'), findsNothing);
-
-    // Every seat offers Caller, and the pad opens off the number itself.
     expect(find.text('Caller'), findsNWidgets(4));
-    await t.tap(find.text('·').first);
-    await t.pumpAndSettle();
-    expect(find.text('13'), findsWidgets);
+    expect(find.text('Edit'), findsNWidgets(4));
+    expect(find.text('Dash'), findsNWidgets(4));
 
-    await t.tap(find.text('7').first);
+    // Nothing can be fixed before the call is: Edit is held shut.
+    await t.tap(find.text('Edit').first);
     await t.pumpAndSettle();
+    expect(find.byType(CallPanel), findsNothing);
+
+    // Seat 0 takes the call. The panel asks for the trump and the number
+    // together, and neither reaches the round until Confirm.
+    await t.tap(find.text('Caller').first);
+    await t.pumpAndSettle();
+    expect(find.byType(CallPanel), findsOneWidget);
+
+    final inPanel = find.descendant(
+      of: find.byType(CallPanel),
+      matching: find.text('7'),
+    );
+    await t.tap(inPanel);
+    await t.tap(find.descendant(
+      of: find.byType(CallPanel),
+      matching: find.text('♥'),
+    ));
+    await t.pumpAndSettle();
+    expect(c.working.caller, isNull, reason: 'nothing lands before Confirm');
+
+    await t.tap(find.text('CONFIRM'));
+    await t.pumpAndSettle();
+    expect(c.working.caller, 0);
+    expect(c.working.trump, Suit.hearts);
     expect(c.working.bids[0], 7);
+
+    // With the call down, the rest of the table can be filled in.
+    await t.tap(find.text('Edit').at(1));
+    await t.pumpAndSettle();
+    expect(find.byType(CallPanel), findsOneWidget);
+    await t.tap(find.descendant(
+      of: find.byType(CallPanel),
+      matching: find.text('3'),
+    ));
+    await t.pumpAndSettle();
+    await t.tap(find.text('CONFIRM'));
+    await t.pumpAndSettle();
+    expect(c.working.bids[1], 3);
   });
 
-  testWidgets('pressing Caller marks the seat and holds the top', (t) async {
+  testWidgets('the call can be handed back from the panel that took it',
+      (t) async {
     final c = await pumpEntry(t, Screen.bid);
 
     await t.tap(find.text('Caller').first);
     await t.pumpAndSettle();
+    await t.tap(find.descendant(
+      of: find.byType(CallPanel),
+      matching: find.text('7'),
+    ));
+    await t.tap(find.descendant(
+      of: find.byType(CallPanel),
+      matching: find.text('♠'),
+    ));
+    await t.pumpAndSettle();
+    await t.tap(find.text('CONFIRM'));
+    await t.pumpAndSettle();
     expect(c.working.caller, 0);
 
-    // Pressing it again hands the call back to the estimates.
+    // Pressing Caller on the seat that holds it offers the way out.
     await t.tap(find.text('Caller').first);
+    await t.pumpAndSettle();
+    await t.tap(find.text('Clear the call'));
     await t.pumpAndSettle();
     expect(c.working.caller, isNull);
   });
@@ -116,7 +175,14 @@ void main() {
 
     expect(c.laggardIndex, 3);
     expect(c.leaderIndex, 2);
-    // Once on the seat itself, once over that seat's column on the sheet.
+    // The sheet is folded away behind its tab, so only the seats wear them.
+    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    expect(find.image(const AssetImage('assets/koz.png')), findsOneWidget);
+
+    // Pull the sheet down and the same two seats wear them again, over their
+    // columns on the sheet.
+    await t.tap(find.byType(ScoreTab));
+    await t.pumpAndSettle();
     expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
     expect(find.image(const AssetImage('assets/koz.png')), findsNWidgets(2));
   });

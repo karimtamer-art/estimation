@@ -70,14 +70,17 @@ class _HomeShellState extends State<HomeShell> {
     }
     // The round counter belongs to a game still being played. Setup has no
     // round yet, and a finished game has no next one.
-    final showHeader =
-        c.screen != Screen.setup &&
-            c.screen != Screen.setupPlayers &&
-            c.screen != Screen.settings &&
-            c.screen != Screen.done;
+    final showHeader = c.screen != Screen.setup &&
+        c.screen != Screen.setupPlayers &&
+        c.screen != Screen.settings &&
+        c.screen != Screen.done;
     // Over or under is only live while a round is being played.
-    final showOverUnder =
-        c.screen == Screen.bid || c.screen == Screen.tricks;
+    final showOverUnder = c.screen == Screen.bid || c.screen == Screen.tricks;
+    // The pull-down sheet belongs to a game that has a scoresheet at all.
+    final showSheet = c.screen == Screen.bid ||
+        c.screen == Screen.tricks ||
+        c.screen == Screen.result ||
+        c.screen == Screen.done;
 
     // Home carries its own language button and needs the full frame.
     if (c.screen == Screen.home) {
@@ -86,62 +89,53 @@ class _HomeShellState extends State<HomeShell> {
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            // Landscape: let the seats use the real width of the device.
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: showHeader
-                            ? Text(
-                                '${s.round} ${(c.playedCount + 1).clamp(1, c.mode.totalRounds)} '
-                                '${s.of} ${c.mode.totalRounds}',
-                                style: labelStyle(size: 11),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      if (showOverUnder) OverUnderPill(c: c),
-                      if (showHeader && c.currentMult > 1)
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold,
-                            borderRadius: BorderRadius.circular(3),
+        child: Stack(
+          children: [
+            Center(
+              child: ConstrainedBox(
+                // Landscape: let the seats use the real width of the device.
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: showHeader
+                                ? Text(
+                                    '${s.round} ${(c.playedCount + 1).clamp(1, c.mode.totalRounds)} '
+                                    '${s.of} ${c.mode.totalRounds}',
+                                    style: labelStyle(size: 11),
+                                  )
+                                : const SizedBox.shrink(),
                           ),
-                          child: Text('\u00d7${c.currentMult}',
-                              style: const TextStyle(
-                                  fontFamily: kMono,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.onGold)),
-                        ),
-                      _IconBtn(label: '\u2302', onTap: c.goHome),
-                      const SizedBox(width: 6),
-                      _IconBtn(
-                        label: c.arabic ? 'EN' : '\u0639',
-                        onTap: c.toggleLanguage,
+                          if (showOverUnder) OverUnderPill(c: c),
+                          _IconBtn(label: '\u2302', onTap: c.goHome),
+                          const SizedBox(width: 6),
+                          _IconBtn(
+                            label: c.arabic ? 'EN' : '\u0639',
+                            onTap: c.toggleLanguage,
+                          ),
+                          const SizedBox(width: 6),
+                          _IconBtn(
+                            label: '\u2699',
+                            onTap: c.screen == Screen.settings
+                                ? c.closeSettings
+                                : c.openSettings,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      _IconBtn(
-                        label: '\u2699',
-                        onTap: c.screen == Screen.settings
-                            ? c.closeSettings
-                            : c.openSettings,
-                      ),
-                    ],
-                  ),
+                    ),
+                    Expanded(child: _body()),
+                  ],
                 ),
-                Expanded(child: _body()),
-              ],
+              ),
             ),
-          ),
+            // The scoresheet sits above everything, folded away off the top
+            // edge with only its tab showing.
+            if (showSheet) ScoreDrawer(key: const ValueKey('sheet'), c: c),
+          ],
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'models.dart';
+
 /// Every scoring constant lives here. Nothing else in the app hard-codes a
 /// number. Edit these (or the in-app settings screen) without touching logic.
 ///
@@ -24,7 +26,21 @@ class Rules {
   bool dashStacksSole; // dash also collects soleBonus
 
   bool allMissZero; // nobody made their bid -> round scores 0
-  List<int> ladder; // sa'aydeh: next round x2, then x3
+
+  // Sa'aydeh, the two ways a round can carry into the next one.
+  int passMult; // all passed -> the next round is worth this, and no more
+  int missMultiply; // nobody made it -> what is on the table is multiplied
+
+  // Three or more seats sharing the HIGHEST call doubles the round. Not the
+  // total, not any three matching numbers — the top of the table, shared.
+  // Egyptian table rule for the fixed-trump Color rounds. Deliberately not
+  // called Tasbeet: that word is a different bidding idea.
+  bool sameHighestCallDouble; // the rule on or off
+  int sameHighestCallMin; // how many must share the top call
+  int sameHighestCallMult; // what the round is multiplied by when they do
+  bool sameHighestCallColorOnly; // Color rounds only, or the whole game
+  bool sameHighestCallStacks; // multiply what is already running, or floor it
+  List<Suit> sameHighestCallSuits; // which trumps it is played under
 
   // HOUSE rule — not in the published ruleset
   bool houseAllEqualDouble; // everyone estimated the same -> x2 + re-estimate
@@ -44,7 +60,14 @@ class Rules {
     required this.dashStacksRound,
     required this.dashStacksSole,
     required this.allMissZero,
-    required this.ladder,
+    required this.passMult,
+    required this.missMultiply,
+    required this.sameHighestCallDouble,
+    required this.sameHighestCallMin,
+    required this.sameHighestCallMult,
+    required this.sameHighestCallColorOnly,
+    required this.sameHighestCallStacks,
+    required this.sameHighestCallSuits,
     required this.houseAllEqualDouble,
   });
 
@@ -63,7 +86,17 @@ class Rules {
         dashStacksRound: false,
         dashStacksSole: false,
         allMissZero: true,
-        ladder: const [2, 3],
+        passMult: 2,
+        missMultiply: 2,
+        sameHighestCallDouble: true,
+        sameHighestCallMin: 3,
+        sameHighestCallMult: 2,
+        sameHighestCallColorOnly: true,
+        // Stacking is a decision, not an accident: on, a x2 already running
+        // becomes x4. Turn it off and the round is simply worth at least the
+        // doubled value instead.
+        sameHighestCallStacks: true,
+        sameHighestCallSuits: const [...kColorOrder],
         houseAllEqualDouble: true,
       );
 
@@ -82,7 +115,14 @@ class Rules {
         'dashStacksRound': dashStacksRound,
         'dashStacksSole': dashStacksSole,
         'allMissZero': allMissZero,
-        'ladder': ladder,
+        'passMult': passMult,
+        'missMultiply': missMultiply,
+        'sameHighestCallDouble': sameHighestCallDouble,
+        'sameHighestCallMin': sameHighestCallMin,
+        'sameHighestCallMult': sameHighestCallMult,
+        'sameHighestCallColorOnly': sameHighestCallColorOnly,
+        'sameHighestCallStacks': sameHighestCallStacks,
+        'sameHighestCallSuits': [for (final su in sameHighestCallSuits) su.name],
         'houseAllEqualDouble': houseAllEqualDouble,
       };
 
@@ -90,6 +130,15 @@ class Rules {
     final d = Rules.defaults();
     int i(String k, int f) => (j[k] as num?)?.toInt() ?? f;
     bool b(String k, bool f) => j[k] as bool? ?? f;
+    List<Suit> suits(String k, List<Suit> f) {
+      final raw = j[k] as List?;
+      if (raw == null) return List<Suit>.from(f);
+      return [
+        for (final name in raw)
+          for (final su in Suit.values)
+            if (su.name == name) su,
+      ];
+    }
     return Rules(
       tricks: i('tricks', d.tricks),
       minCallerBid: i('minCallerBid', d.minCallerBid),
@@ -105,8 +154,18 @@ class Rules {
       dashStacksRound: b('dashStacksRound', d.dashStacksRound),
       dashStacksSole: b('dashStacksSole', d.dashStacksSole),
       allMissZero: b('allMissZero', d.allMissZero),
-      ladder: (j['ladder'] as List?)?.map((e) => (e as num).toInt()).toList() ??
-          List<int>.from(d.ladder),
+      passMult: i('passMult', d.passMult),
+      missMultiply: i('missMultiply', d.missMultiply),
+      sameHighestCallDouble:
+          b('sameHighestCallDouble', d.sameHighestCallDouble),
+      sameHighestCallMin: i('sameHighestCallMin', d.sameHighestCallMin),
+      sameHighestCallMult: i('sameHighestCallMult', d.sameHighestCallMult),
+      sameHighestCallColorOnly:
+          b('sameHighestCallColorOnly', d.sameHighestCallColorOnly),
+      sameHighestCallStacks:
+          b('sameHighestCallStacks', d.sameHighestCallStacks),
+      sameHighestCallSuits: suits('sameHighestCallSuits',
+          d.sameHighestCallSuits),
       houseAllEqualDouble: b('houseAllEqualDouble', d.houseAllEqualDouble),
     );
   }

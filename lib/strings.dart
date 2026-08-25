@@ -62,6 +62,24 @@ class Str {
   String get points => _p('points', 'نقطة');
   String get editingRound => _p('Editing round', 'تعديل جولة');
 
+  // The estimate screen, one step at a time.
+  String get stepDash => _p('Holding the dash window', 'الداش لسه مفتوح');
+  String get stepCaller => _p('Press who called', 'اضغط مين اللي كول');
+  String get stepTrump => _p('The caller picks the trump', 'الكولر يختار الحكم');
+  String get stepCallerBid =>
+      _p('How many will the caller make?', 'الكولر هيلم كام؟');
+  String get stepTable => _p('The rest of the table estimates',
+      'باقي الطاولة يقدّروا');
+  String get stepReady => _p('All set — enter the tricks', 'تمام — سجّلوا اللمات');
+  // The call panel.
+  String get theCall => _p('The call', 'الكول');
+  String get howMany => _p('How many?', 'كام لمة؟');
+  String get confirm => _p('Confirm', 'تأكيد');
+  String get cancel => _p('Cancel', 'إلغاء');
+  String get clearCall => _p('Clear the call', 'الغِ الكول');
+  String get edit => _p('Edit', 'تعديل');
+  String get pickTrumpFirst => _p('Pick a trump', 'اختار الحكم');
+
   String get errTotal13 =>
       _p('Total is exactly 13 — someone must change.',
           'المجموع ١٣ بالضبط — لازم أحد يغيّر.');
@@ -82,6 +100,11 @@ class Str {
       'Everyone estimated the same — round doubles, estimate again.',
       'الجميع قدّر نفس الرقم — الجولة تتضاعف، أعيدوا.');
   String get rebid => _p('Double & re-estimate', 'ضاعف وأعد');
+  /// Said on the result screen when the round doubled because the top call
+  /// was shared, so nobody has to work out where the multiplier came from.
+  String get sharedTopCall =>
+      _p('Top call was shared. Round', 'الكول الأعلى كان متشارك. الجولة');
+
   String get allMissed =>
       _p('Nobody made it. Next round', 'لا أحد حقق. الجولة القادمة');
   String get skipped =>

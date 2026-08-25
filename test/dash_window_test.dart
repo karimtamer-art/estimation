@@ -86,15 +86,16 @@ void main() {
     t.view.devicePixelRatio = 2.0;
     addTearDown(t.view.reset);
 
-    // Mini is five normal rounds then five color ones; with five played, the
-    // round about to open is a color round.
     final c = GameController()
       ..draftPlayers = ['Karim', 'Ali', 'Sara', 'Omar']
-      ..mode = GameMode.mini
-      ..rounds = List.generate(5, (_) => Round.empty(4));
+      ..mode = GameMode.mini;
 
     await t.pumpWidget(EstimationApp(controller: c));
     c.startGame();
+    // Mini is five normal rounds then five color ones; with five on the sheet,
+    // the round about to open is a color round.
+    c.rounds.addAll(List.generate(5, (_) => Round.empty(4)));
+    c.continueAfterResult();
     await t.pumpAndSettle();
 
     expect(c.isColorRound, isTrue);

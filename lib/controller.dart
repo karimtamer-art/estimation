@@ -10,6 +10,13 @@ import 'strings.dart';
 
 enum Screen { home, setup, bid, tricks, result, done, settings, setupPlayers }
 
+/// The estimate screen is walked in order, the way the table actually plays
+/// it: hold the dash window, then press who won the bidding, then that seat
+/// picks the trump and says what it will make, then everyone else estimates.
+/// Each step unlocks the next, so a round can no longer reach the tricks with
+/// nobody named as Caller and no trump on the table.
+enum BidStep { dash, caller, trump, callerBid, table, ready }
+
 const _kStoreKey = 'estimation_state_v1';
 
 class GameController extends ChangeNotifier {
@@ -61,7 +68,24 @@ class GameController extends ChangeNotifier {
 
   int get playerCount => players.length;
   int get playedCount => rounds.where((r) => !r.skipped).length;
-  int get currentMult => pendingMult * working.houseMult;
+  /// Three or more seats on the highest call, in a round the rule covers.
+  /// Read live off the round being called, so the table sees the double land
+  /// while they are still calling rather than when the hand is scored.
+  bool get sameCallDouble => sameHighestCall(
+        working,
+        rules,
+        isColorRound: isColorRound,
+        trump: lockedTrump ?? working.trump,
+      );
+
+  int get currentMult {
+    final base = pendingMult * working.houseMult;
+    if (!sameCallDouble) return base;
+    final m = rules.sameHighestCallMult;
+    if (m < 1) return base;
+    if (rules.sameHighestCallStacks) return base * m;
+    return base < m ? m : base;
+  }
 
   /// Trump is locked in color rounds unless someone super calls.
   bool get superCalled {
@@ -118,6 +142,39 @@ class GameController extends ChangeNotifier {
       live.add(working.bids[i]!);
     }
     return live.length == playerCount && live.every((b) => b == live.first);
+  }
+
+  /// Where the estimate screen has got to. Read off the round itself, so it
+  /// survives a reload and an edit walks straight in at the end.
+  BidStep get bidStep {
+    if (screen != Screen.bid) return BidStep.ready;
+    if (dashPromptPending) return BidStep.dash;
+    final caller = working.caller;
+    if (caller == null) return BidStep.caller;
+    if ((lockedTrump ?? working.trump) == null) return BidStep.trump;
+    if (!working.dash[caller] && working.bids[caller] == null) {
+      return BidStep.callerBid;
+    }
+    if (!bidsComplete) return BidStep.table;
+    return BidStep.ready;
+  }
+
+  /// Whether [seat] may be given a number yet. The table is held until the
+  /// Caller and the trump are settled, and then the Caller goes first — its
+  /// call is the one every other estimate is measured against.
+  bool canEstimate(int seat) {
+    if (screen != Screen.bid) return true;
+    switch (bidStep) {
+      case BidStep.dash:
+      case BidStep.caller:
+      case BidStep.trump:
+        return false;
+      case BidStep.callerBid:
+        return seat == working.caller;
+      case BidStep.table:
+      case BidStep.ready:
+        return true;
+    }
   }
 
   /// Validation message for the current entry screen, or null if it's clean.
@@ -308,11 +365,23 @@ class GameController extends ChangeNotifier {
   }
 
   /// The draft becomes the table. A seat left blank is named for its number.
+  ///
+  /// Pressing Start is the one unambiguous "this is a new game", so the sheet
+  /// is wiped here: the rounds, the multiplier the last game was carrying, and
+  /// the offer to resume it. Walking into setup and thinking better of it
+  /// never gets this far, so a game can still be backed out of and resumed.
   void startGame() {
     for (var i = 0; i < players.length; i++) {
       final name = i < draftPlayers.length ? draftPlayers[i].trim() : '';
       players[i] = name.isEmpty ? 'P${i + 1}' : name;
     }
+    rounds = [];
+    pendingMult = 1;
+    streak = 0;
+    lastResult = null;
+    lastMessage = null;
+    resultIndex = 0;
+    _resumeTarget = null;
     _beginRound();
   }
 
@@ -328,7 +397,10 @@ class GameController extends ChangeNotifier {
   /// Whether [player] may be given [value] on the screen currently open.
   /// The pad greys out everything this refuses, so a number the round's rules
   /// forbid is never entered and then rejected a step later.
-  bool canPick(int player, int value) {
+  /// [asCaller] weighs the number as if this seat had the call, which is how
+  /// the call panel offers its numbers: the seat is not the Caller yet, but
+  /// the number it is about to confirm has to survive the Caller's rules.
+  bool canPick(int player, int value, {bool asCaller = false}) {
     if (value < 0 || value > rules.tricks) return false;
     final list = screen == Screen.tricks ? working.tricks : working.bids;
 
@@ -354,7 +426,7 @@ class GameController extends ChangeNotifier {
       return true;
     }
 
-    final caller = working.caller;
+    final caller = asCaller ? player : working.caller;
     if (caller != null && caller != player) {
       // Nobody outbids the caller. Matching is fine — that is With.
       final callerBid = working.bids[caller];
@@ -392,15 +464,6 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
-  /// Mark which seat won the bidding. Pressing the same seat again clears it,
-  /// which hands the Caller back to whoever holds the highest estimate.
-  void setCaller(int player) {
-    if (working.dash[player]) return; // a dashed seat called nothing
-    working.caller = working.caller == player ? null : player;
-    notifyListeners();
-    _save();
-  }
-
   void toggleDash(int player) {
     final on = !working.dash[player];
     if (on && working.dash.where((d) => d).length >= rules.maxDash) return;
@@ -410,6 +473,27 @@ class GameController extends ChangeNotifier {
     working.bids[player] = on ? 0 : null;
     working.order.remove(player);
     if (!on) working.order.add(player);
+    notifyListeners();
+    _save();
+  }
+
+  /// The call, settled in one press of Confirm: who called it, under which
+  /// trump, and for how many. A colour round hands [su] in as null, since its
+  /// trump was never the caller's to pick.
+  void applyCall(int player, Suit? su, int bid) {
+    if (working.dash[player]) return;
+    working.caller = player;
+    if (su != null) working.trump = su;
+    working.bids[player] = bid.clamp(0, rules.tricks);
+    working.order.remove(player);
+    working.order.add(player);
+    notifyListeners();
+    _save();
+  }
+
+  /// Hands the call back to nobody, leaving the trump where it was.
+  void clearCaller() {
+    working.caller = null;
     notifyListeners();
     _save();
   }
@@ -474,10 +558,34 @@ class GameController extends ChangeNotifier {
     final done = rounds[target];
     resultIndex = target;
     lastResult = RoundResult(done.scores, done.lines, streak > 0, derive(done, rules));
-    lastMessage = streak > 0 ? '${s.allMissed} \u00d7$pendingMult' : null;
+    // What the table needs told: the round that just carried, or - failing
+    // that - why the round they just played was worth more than face value.
+    lastMessage = streak > 0
+        ? '${s.allMissed} \u00d7$pendingMult'
+        : (_sameCallOn(target)
+            ? '${s.sharedTopCall} \u00d7${done.mult}'
+            : null);
     screen = Screen.result;
     notifyListeners();
     _save();
+  }
+
+  /// Whether the round at [index] doubled on the shared-top-call rule. The
+  /// Color rounds are counted off the rounds actually played, so a round the
+  /// table passed does not shift which trump a later round was dealt under.
+  bool _sameCallOn(int index) {
+    final r = rounds[index];
+    if (r.skipped) return false;
+    var played = 0;
+    for (var i = 0; i < index; i++) {
+      if (!rounds[i].skipped) played++;
+    }
+    return sameHighestCall(
+      r,
+      rules,
+      isColorRound: mode.fixedTrump(played) != null,
+      trump: r.trump,
+    );
   }
 
   void continueAfterResult() {
@@ -533,7 +641,7 @@ class GameController extends ChangeNotifier {
   }
 
   void _recompute() {
-    final c = recomputeAll(rounds, rules, playerCount, s);
+    final c = recomputeAll(rounds, rules, playerCount, s, mode: mode);
     pendingMult = c.pendingMult;
     streak = c.streak;
   }

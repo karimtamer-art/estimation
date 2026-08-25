@@ -89,14 +89,45 @@ void main() {
     expect(out.scores.every((x) => x == 0), isTrue);
   });
 
-  test('all-miss ladder doubles then triples the following rounds', () {
+  test('a round nobody made doubles what is already on the table', () {
     Round miss() => build(bids: [5, 4, 3, 2], tricks: [6, 3, 4, 0]);
-    final rounds = [miss(), miss(), build(bids: [5, 4, 3, 2], tricks: [5, 4, 3, 1])];
+    final won = build(bids: [5, 4, 3, 2], tricks: [5, 4, 3, 1]);
+    final rounds = [miss(), miss(), miss(), won];
     final chain = recomputeAll(rounds, rules, 4, s);
     expect(rounds[0].mult, 1);
     expect(rounds[1].mult, 2); // after one all-miss
-    expect(rounds[2].mult, 3); // after two
-    expect(chain.streak, 0); // last round had a winner
+    expect(rounds[2].mult, 4); // doubled again, not stepped to 3
+    expect(rounds[3].mult, 8);
+    expect(chain.pendingMult, 1); // somebody won, so it is back to face value
+    expect(chain.streak, 0);
+  });
+
+  test('passing sets the next round to double and holds it there', () {
+    Round passed() => Round.empty(4)..skipped = true;
+    final rounds = [passed(), passed(), passed()];
+    final chain = recomputeAll(rounds, rules, 4, s);
+    expect(rounds[0].mult, 1);
+    expect(rounds[1].mult, 2); // the pass doubled it
+    expect(rounds[2].mult, 2); // passing again does not stack
+    expect(chain.pendingMult, 2);
+  });
+
+  test('a miss on top of a passed round doubles it again', () {
+    Round miss() => build(bids: [5, 4, 3, 2], tricks: [6, 3, 4, 0]);
+    final rounds = [Round.empty(4)..skipped = true, miss(), miss()];
+    final chain = recomputeAll(rounds, rules, 4, s);
+    expect(rounds[1].mult, 2); // the pass
+    expect(rounds[2].mult, 4); // the miss on top of it
+    expect(chain.pendingMult, 8);
+  });
+
+  test('passing after a stacked miss holds the multiplier, never lowers it',
+      () {
+    Round miss() => build(bids: [5, 4, 3, 2], tricks: [6, 3, 4, 0]);
+    final rounds = [miss(), miss(), Round.empty(4)..skipped = true];
+    final chain = recomputeAll(rounds, rules, 4, s);
+    expect(rounds[2].mult, 4);
+    expect(chain.pendingMult, 4); // the pass leaves the 4 where it is
   });
 
   test('multiplier scales the whole round', () {

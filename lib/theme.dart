@@ -13,6 +13,11 @@ class AppColors {
   static const gold = Color(0xFFD9A441);
   static const onGold = Color(0xFF1A1205);
   static const green = Color(0xFF5FC08B);
+  static const blue = Color(0xFF57A6E0);
+
+  /// Labels laid over [red] and [blue] at full strength.
+  static const onRed = Color(0xFF3A0D05);
+  static const onBlue = Color(0xFF04202F);
   static const red = Color(0xFFE0705C);
 }
 
@@ -68,3 +73,39 @@ TextStyle numberStyle({Color? color, double size = 28, FontWeight? weight}) =>
       color: color ?? AppColors.gold,
       height: 1,
     );
+
+/// The picker draws each length as a glossy button, so every accent also
+/// carries a bright top, a deep bottom and a dark rim to bevel against.
+extension ModeFace on GameMode {
+  /// Top of the button face.
+  Color get faceHi => const {
+        GameMode.micro: Color(0xFF63E39B),
+        GameMode.mini: Color(0xFF62B8F7),
+        GameMode.full: Color(0xFFF7C948),
+      }[this]!;
+
+  /// Bottom of the button face.
+  Color get faceLo => const {
+        GameMode.micro: Color(0xFF12864A),
+        GameMode.mini: Color(0xFF1358B4),
+        GameMode.full: Color(0xFFC26A12),
+      }[this]!;
+
+  /// Outline that makes the face sit proud of the background.
+  Color get faceRim => const {
+        GameMode.micro: Color(0xFF073E22),
+        GameMode.mini: Color(0xFF072A52),
+        GameMode.full: Color(0xFF4A2905),
+      }[this]!;
+}
+
+/// One colour per seat, used wherever the four players have to be told apart
+/// at a glance — the score graph draws a line per seat in these.
+const List<Color> kSeatColors = [
+  Color(0xFFF7C948),
+  Color(0xFF5AB8F7),
+  Color(0xFF5FE0A0),
+  Color(0xFFFF7F6B),
+];
+
+Color seatColor(int index) => kSeatColors[index % kSeatColors.length];

@@ -274,18 +274,25 @@ class SeatColumn extends StatelessWidget {
             // Everything a seat can say about the round: it won the bidding,
             // it is fixing its number, or it dashed — the last one still open
             // for a seat that missed the window.
+            //
+            // A Color round takes both of the outer two away. Nobody presses
+            // the call there, because the highest estimate simply takes it,
+            // and a Color round cannot be dashed at all. That leaves the seat
+            // with one thing to say, so Edit says it alone.
             Row(
               children: [
-                Expanded(
-                  child: _TagButton(
-                    label: s.caller,
-                    selected: chosenCaller == index,
-                    enabled: !isDash,
-                    onTap: () =>
-                        CallPanel.show(context, c, index, asCaller: true),
+                if (!c.isColorRound) ...[
+                  Expanded(
+                    child: _TagButton(
+                      label: s.caller,
+                      selected: chosenCaller == index,
+                      enabled: !isDash,
+                      onTap: () =>
+                          CallPanel.show(context, c, index, asCaller: true),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
+                  const SizedBox(width: 4),
+                ],
                 Expanded(
                   child: _TagButton(
                     label: s.edit,
@@ -296,15 +303,17 @@ class SeatColumn extends StatelessWidget {
                         CallPanel.show(context, c, index, asCaller: false),
                   ),
                 ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _TagButton(
-                    label: s.dash,
-                    selected: isDash,
-                    enabled: canDash,
-                    onTap: () => c.toggleDash(index),
+                if (!c.isColorRound) ...[
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _TagButton(
+                      label: s.dash,
+                      selected: isDash,
+                      enabled: canDash,
+                      onTap: () => c.toggleDash(index),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ],
@@ -903,6 +912,77 @@ class _TotalCell extends StatelessWidget {
 
 // -------------------------------------------------------------- bid steps
 
+/// What the round is being played under. A Color round never asked the table
+/// for a trump — it hands one over — so the app has to say which one it is
+/// before a single estimate goes down. It used to say nothing at all, and the
+/// table walked into a Spades round picking a caller with no idea.
+class TrumpBanner extends StatelessWidget {
+  final GameController c;
+  const TrumpBanner({super.key, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    final locked = c.lockedTrump;
+    final su = locked ?? c.working.trump;
+    if (su == null) return const SizedBox.shrink();
+    final forced = locked != null;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      decoration: BoxDecoration(
+        // A forced trump wears the gold: it is not a choice anyone made and
+        // should not read like one.
+        color: forced ? AppColors.gold.withOpacity(0.12) : AppColors.surface,
+        border: Border.all(color: forced ? AppColors.gold : AppColors.line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Text(
+            su.symbol,
+            style: TextStyle(
+              fontSize: 34,
+              height: 1,
+              color: su.isRed ? AppColors.red : AppColors.text,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  su.label(c.arabic),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  forced
+                      ? '${s.colorRoundOf(c.colorRoundNumber, c.mode.colorRounds)}'
+                          ' · ${s.trumpForced}'
+                      : s.trump,
+                  maxLines: 2,
+                  style: labelStyle(
+                      size: 9,
+                      color: forced ? AppColors.gold : AppColors.dim),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The order the estimate screen is walked in, drawn as four beads with the
 /// live one lit and the line under them saying what the table does next.
 /// Nothing further down the screen opens until its bead is reached.
@@ -916,12 +996,19 @@ class StepStrip extends StatelessWidget {
     final step = c.bidStep;
     // The dash window is skipped in the colour rounds, where the trump is
     // already known and there is nothing to wait for.
-    final beads = <BidStep>[
-      if (!c.isColorRound) BidStep.dash,
-      BidStep.caller,
-      if (c.lockedTrump == null) BidStep.trump,
-      BidStep.callerBid,
-    ];
+    final beads = c.isColorRound
+        // Nothing is settled before the numbers in a Color round: no window,
+        // no call to press. Only a super call puts a trump back on the path.
+        ? <BidStep>[
+            if (c.lockedTrump == null) BidStep.trump,
+            BidStep.table,
+          ]
+        : <BidStep>[
+            BidStep.dash,
+            BidStep.caller,
+            if (c.lockedTrump == null) BidStep.trump,
+            BidStep.callerBid,
+          ];
     final at = _rank(step);
     return Container(
       padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
@@ -1425,9 +1512,18 @@ class _CallPanelState extends State<CallPanel> {
 
   GameController get c => widget.c;
 
-  /// The trump is only asked for when this seat is taking the call and the
-  /// round has not already fixed one.
-  bool get _needsSuit => widget.asCaller && c.lockedTrump == null;
+  /// When this panel has to settle a trump as well as a number.
+  ///
+  /// Either the seat is taking the call in a round that has no trump yet, or
+  /// the number it is about to say is a super call — which is the one thing
+  /// that takes a Color round's trump back off it and hands it to the caller.
+  /// Read off the number on the panel, not off the round, so the suits drop
+  /// down the moment 8 is pressed rather than after Confirm.
+  bool get _needsSuit {
+    final bid = _bid;
+    if (c.isColorRound) return bid != null && bid >= c.rules.superCallMin;
+    return widget.asCaller && c.lockedTrump == null;
+  }
 
   @override
   void initState() {
@@ -1445,7 +1541,7 @@ class _CallPanelState extends State<CallPanel> {
     if (widget.asCaller) {
       c.applyCall(widget.seat, _needsSuit ? _suit : null, _bid!);
     } else {
-      c.setValue(widget.seat, _bid!);
+      c.setValue(widget.seat, _bid!, trump: _needsSuit ? _suit : null);
     }
     Navigator.of(context).pop();
   }

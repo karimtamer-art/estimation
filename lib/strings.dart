@@ -132,6 +132,12 @@ class Str {
   String get king => _p('King', 'الملك');
   String get koz => _p('Koz', 'كوز');
 
+  /// A Color round hands the trump over instead of asking for it, so the
+  /// table has to be told which one it is before anybody estimates.
+  String get trumpForced => _p('fixed for this round', 'محدد لهذه الجولة');
+  String colorRoundOf(int n, int total) =>
+      ar ? 'ألوان $n من $total' : 'Color $n of $total';
+
   // The end screen.
   String get gameResult => _p('Game Result', 'نتيجة اللعبة');
   String get biggestWin => _p('Biggest win', 'أكبر مكسب');

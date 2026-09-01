@@ -102,10 +102,37 @@ every other call does.
 **Derived, never chosen:**
 
 - **Caller** is the highest estimate. Anyone matching it is **With**. They score
-  identically, so a tie at the top needs no tie-break.
+  identically, so a tie at the top needs no tie-break. The Caller button opens
+  the auction rather than closing it: a seat estimating later may come over the
+  top, and the call goes with the number. A seat that only *matches* the top is
+  With — the seat that said it first keeps the call.
 - **Risk** goes to the last player to settle their estimate, since they're the
   one forced away from 13. Level = `|total − 13| ÷ 2`, rounded down.
 - **Over/Under** from whether the table's total sits above or below 13.
+
+## The Color rounds
+
+The trailing rounds are not the caller's to pick a trump for — the table is
+handed one, in a fixed order: **sun, spades, hearts, diamonds, clubs**. Full
+plays 13 normal rounds then those five; Mini plays 5 then those five; Micro has
+none. They are counted off the rounds actually *played*, so a round the table
+passed does not use up a colour.
+
+The round says which one it is on the estimate screen, in gold, before anybody
+estimates — and again while the tricks come in, where there is no suit row to
+read it off.
+
+Because the trump came with the round, a Color round settles nothing before the
+numbers. There is no dash window and no dash button — a Color round cannot be
+dashed — and nobody presses Caller, since the highest estimate simply takes the
+call. Each seat is offered **Edit** alone, and the table estimates in whatever
+order it speaks.
+
+A **super call** of 8 or more is the one thing that takes the colour back off
+the round. Press 8 or higher in the call panel and the suits drop down under
+the numbers there and then, because that seat has just won the right to name
+the trump; Confirm lands the number and the suit together. Drop back under 8
+and the round takes its colour back.
 
 **House rules kept** (the published ruleset is silent on these): Micro (5
 rounds) and Mini (10), and everyone estimating the same doubling the round and

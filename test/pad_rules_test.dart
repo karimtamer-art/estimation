@@ -28,23 +28,34 @@ GameController posed({
 List<int> offered(GameController c, int seat) =>
     [for (var n = 0; n <= c.rules.tricks; n++) if (c.canPick(seat, n)) n];
 
+/// The same read, but for the seat pressing Caller rather than one estimating
+/// into a call that already exists.
+List<int> offeredAsCaller(GameController c, int seat) => [
+      for (var n = 0; n <= c.rules.tricks; n++)
+        if (c.canPick(seat, n, asCaller: true)) n,
+    ];
+
 void main() {
   group('estimates', () {
-    test('nobody may outbid the seat pressed as Caller', () {
+    test('the table may come over the top of a call already down', () {
+      // The auction is not closed by the press: every number stays open, and
+      // the call moves to whoever ends up holding the highest.
       final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0);
-      expect(offered(c, 1), [0, 1, 2, 3, 4, 5, 6, 7]);
+      expect(offered(c, 1), [for (var n = 0; n <= 13; n++) n]);
     });
 
-    test('matching the Caller stays open — that is With', () {
+    test('matching the call is With, beating it takes the call', () {
       final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0);
       expect(c.canPick(1, 7), isTrue);
-      expect(c.canPick(1, 8), isFalse);
+      expect(c.canPick(1, 8), isTrue);
     });
 
-    test('the Caller may not call under the minimum, or under the table', () {
+    test('taking the call means clearing the minimum and the whole table', () {
       final c = posed(screen: Screen.bid, bids: [null, 5, null, null], caller: 0);
       // Below minCallerBid (4) is out, and so is anything seat 1 already beats.
-      expect(offered(c, 0), [5, 6, 7, 8, 9, 10, 11, 12, 13]);
+      expect(offeredAsCaller(c, 0), [5, 6, 7, 8, 9, 10, 11, 12, 13]);
+      // Estimating into the round carries neither restriction.
+      expect(c.canPick(0, 2), isTrue);
     });
 
     test('the last seat cannot land the table on exactly 13', () {

@@ -107,6 +107,12 @@ class GameController extends ChangeNotifier {
   /// need the dash window held open for it.
   bool get isColorRound => mode.fixedTrump(_roundIndex) != null;
 
+  /// Which Color round this is, counting from 1, or 0 when it is not one.
+  /// Counted off the rounds actually played, the same way the trump is, so a
+  /// round the table passed does not use up a colour.
+  int get colorRoundNumber =>
+      isColorRound ? _roundIndex - mode.normalRounds + 1 : 0;
+
   Derived get derived => derive(working, rules);
 
   bool get bidsComplete {
@@ -149,6 +155,15 @@ class GameController extends ChangeNotifier {
   BidStep get bidStep {
     if (screen != Screen.bid) return BidStep.ready;
     if (dashPromptPending) return BidStep.dash;
+    // A Color round has nothing to settle before the numbers: it cannot be
+    // dashed, its trump came with the round, and nobody presses the call —
+    // the highest estimate takes it. So the table just estimates. The one way
+    // back to a trump here is a super call, which takes it off the round.
+    if (isColorRound) {
+      if ((lockedTrump ?? working.trump) == null) return BidStep.trump;
+      if (!bidsComplete) return BidStep.table;
+      return BidStep.ready;
+    }
     final caller = working.caller;
     if (caller == null) return BidStep.caller;
     if ((lockedTrump ?? working.trump) == null) return BidStep.trump;
@@ -164,6 +179,8 @@ class GameController extends ChangeNotifier {
   /// call is the one every other estimate is measured against.
   bool canEstimate(int seat) {
     if (screen != Screen.bid) return true;
+    // Nothing gates a Color round, so no seat is ever held out of one.
+    if (isColorRound) return true;
     switch (bidStep) {
       case BidStep.dash:
       case BidStep.caller:
@@ -426,15 +443,11 @@ class GameController extends ChangeNotifier {
       return true;
     }
 
-    final caller = asCaller ? player : working.caller;
-    if (caller != null && caller != player) {
-      // Nobody outbids the caller. Matching is fine — that is With.
-      final callerBid = working.bids[caller];
-      if (callerBid != null && value > callerBid) return false;
-    }
-    if (caller == player) {
+    // The table is an auction: a seat may come over the top of the call, and
+    // the call goes with the number. Only the seat TAKING the call has to be
+    // above everyone, since that press is a claim to be the highest.
+    if (asCaller) {
       if (value < rules.minCallerBid) return false;
-      // The call has to be the top of the table to be the call.
       for (var i = 0; i < playerCount; i++) {
         if (i == player || working.dash[i]) continue;
         final b = working.bids[i];
@@ -447,10 +460,42 @@ class GameController extends ChangeNotifier {
     return true;
   }
 
+  /// The call belongs to the highest estimate on the table. It is pressed to
+  /// open with, but the auction can move it afterwards: a seat that comes over
+  /// the top takes the call, and a caller that edits back down loses it.
+  ///
+  /// A seat matching the top does not take it — it is With, and the seat that
+  /// said the number first keeps the call. The Risk is untouched by any of
+  /// this: it stays with the last seat to settle, which is why a late seat
+  /// that outbids the table usually ends up carrying both.
+  void _settleCaller() {
+    int? top;
+    for (var i = 0; i < playerCount; i++) {
+      if (working.dash[i]) continue;
+      final b = working.bids[i];
+      if (b != null && (top == null || b > top)) top = b;
+    }
+    if (top == null) {
+      working.caller = null;
+      return;
+    }
+    final held = working.caller;
+    if (held != null && !working.dash[held] && working.bids[held] == top) {
+      return; // still on the top number, jointly or alone
+    }
+    // Whoever reached that number first owns it; a later match is With.
+    for (final seat in working.order) {
+      if (!working.dash[seat] && working.bids[seat] == top) {
+        working.caller = seat;
+        return;
+      }
+    }
+  }
+
   /// Set a player's number outright, as picked from the number pad.
   /// Same bookkeeping as [step] — dash clears and the player moves to the
   /// back of the estimate order, since they just settled.
-  void setValue(int player, int value) {
+  void setValue(int player, int value, {Suit? trump}) {
     final isBid = screen == Screen.bid;
     final list = isBid ? working.bids : working.tricks;
     list[player] = value.clamp(0, rules.tricks);
@@ -459,12 +504,19 @@ class GameController extends ChangeNotifier {
       working.dash[player] = false;
       working.order.remove(player);
       working.order.add(player);
+      // A super call takes a Color round's trump back off it, and the seat
+      // making the call picks the new one in the same breath.
+      if (trump != null) working.trump = trump;
+      _settleCaller();
     }
     notifyListeners();
     _save();
   }
 
   void toggleDash(int player) {
+    // A Color round cannot be dashed. There is no window to declare one in
+    // and no trump to be surprised by, so the seat is never offered it.
+    if (isColorRound) return;
     final on = !working.dash[player];
     if (on && working.dash.where((d) => d).length >= rules.maxDash) return;
     // Dashing gives up on the round, so it cannot also be the call.
@@ -473,6 +525,8 @@ class GameController extends ChangeNotifier {
     working.bids[player] = on ? 0 : null;
     working.order.remove(player);
     if (!on) working.order.add(player);
+    // A seat dropping out or coming back can hand the call to someone else.
+    _settleCaller();
     notifyListeners();
     _save();
   }

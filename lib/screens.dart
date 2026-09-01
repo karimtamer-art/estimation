@@ -587,6 +587,14 @@ class EntryScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 12),
               children: [
+                // What the round is played under, said before anything else.
+                // A Color round was handed its trump, and on the tricks screen
+                // there is no suit row left to read it off either.
+                if (c.lockedTrump != null ||
+                    (!isBid && c.working.trump != null)) ...[
+                  TrumpBanner(c: c),
+                  const SizedBox(height: 12),
+                ],
                 if (isBid) ...[
                   StepStrip(c: c),
                   const SizedBox(height: 12),

@@ -3,7 +3,11 @@
 .packages
 .flutter-plugins-dependencies
 build/
-pubspec.lock
+
+# pubspec.lock IS committed. This is an application, not a library, so the
+# resolved versions are part of it: CI installs exactly what was tested here
+# instead of re-solving against pub.dev on every build, which was both slower
+# and free to pick up a different version than the one that passed locally.
 
 # Generated platform folders — recreate with `flutter create .`
 # Anchored with a leading slash: unanchored, `ios/` also swallows

@@ -5,7 +5,17 @@
 # must run `flutter create .` before building or it fails immediately.
 
 definitions:
-  flutter_version: &flutter_version 3.44.8
+  # `stable` means the version already installed on the build image, so the
+  # machine starts running scripts immediately. Pinning an exact version that
+  # the image does not carry makes Codemagic download and install the whole
+  # SDK first, before the first line of any script — which is why this build
+  # used to sit there doing nothing far longer than padel-app, despite padel
+  # being much the bigger app.
+  #
+  # The cost is that a Flutter release can now change under the build. If one
+  # ever breaks it, pin the exact version again here — but pin one the image
+  # actually ships, or the wait comes straight back.
+  flutter_version: &flutter_version stable
 
   regenerate: &regenerate
     name: Regenerate platform folders
@@ -58,6 +68,16 @@ workflows:
     name: iOS · TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 60
+
+    # Nothing here was cached before, so every build re-downloaded the whole
+    # pub cache and the CocoaPods setup before it could start. These are the
+    # download directories only — never build output, which is worthless
+    # across machines and only slows the cache restore down.
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
 
     integrations:
       # Codemagic UI → Teams → Integrations → Apple Developer Portal.
@@ -167,6 +187,14 @@ workflows:
     instance_type: linux_x2
     max_build_duration: 30
 
+    # Gradle is the expensive one here: without this its distribution and
+    # every dependency come down again on each build.
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/.gradle/caches
+
     environment:
       flutter: *flutter_version
       vars:
@@ -189,6 +217,11 @@ workflows:
     name: Web
     instance_type: linux_x2
     max_build_duration: 20
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $FLUTTER_ROOT/.pub-cache
 
     environment:
       flutter: *flutter_version

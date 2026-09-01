@@ -555,60 +555,99 @@ class EntryScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 12),
-              children: [
-                if (c.editingIndex != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text('${s.editingRound} ${c.editingIndex! + 1}',
-                        style: labelStyle(color: AppColors.gold)),
+            // Fill the screen where there is room and scroll where there is
+            // not: the seats stretch to the height of a normal phone, and on
+            // a very short one they keep their own size and the page moves
+            // rather than a card being cut off at the bottom.
+            child: LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (c.editingIndex != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                                '${s.editingRound} ${c.editingIndex! + 1}',
+                                style: labelStyle(color: AppColors.gold)),
+                          ),
+                        Text(isBid ? s.estimate : s.tricksWon,
+                            style: labelStyle()),
+                        const SizedBox(height: 6),
+                        // The seats take every point of height going. They
+                        // used to sit at their own size inside a scroll view,
+                        // which left the bottom third of the phone empty.
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < c.playerCount; i++) ...[
+                                Expanded(
+                                  child: SeatColumn(
+                                      c: c, index: i, isBid: isBid),
+                                ),
+                                if (i < c.playerCount - 1)
+                                  const SizedBox(width: 6),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        StatBar(c: c, isBid: isBid),
+                        if (err != null) Banner_(err, warn: true),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
-                Text(isBid ? s.estimate : s.tricksWon, style: labelStyle()),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < c.playerCount; i++) ...[
-                      Expanded(child: SeatColumn(c: c, index: i, isBid: isBid)),
-                      if (i < c.playerCount - 1) const SizedBox(width: 6),
-                    ],
-                  ],
                 ),
-                const SizedBox(height: 10),
-                StatBar(c: c, isBid: isBid),
-                if (err != null) Banner_(err, warn: true),
-              ],
+              ),
             ),
           ),
           const SizedBox(width: 14),
           SizedBox(
             width: 250,
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // What the round is played under, said before anything else.
-                // A Color round was handed its trump, and on the tricks screen
-                // there is no suit row left to read it off either.
-                if (c.lockedTrump != null ||
-                    (!isBid && c.working.trump != null)) ...[
-                  TrumpBanner(c: c),
-                  const SizedBox(height: 12),
-                ],
-                if (isBid) ...[
-                  StepStrip(c: c),
-                  const SizedBox(height: 12),
-                ],
-                // The trump is the caller's to pick, so the suits only come
-                // out once the table has said whose call it is.
-                if (isBid &&
-                    c.lockedTrump == null &&
-                    c.working.caller != null) ...[
-                  Text(s.trump, style: labelStyle()),
-                  const SizedBox(height: 8),
-                  TrumpRow(c: c),
-                  const SizedBox(height: 14),
-                ],
+                // Everything the panel says takes the room above the actions,
+                // and scrolls on its own if a short phone cannot hold it all.
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // What the round is played under, said before anything
+                        // else. A Color round was handed its trump, and on the
+                        // tricks screen there is no suit row to read it off.
+                        if (c.lockedTrump != null ||
+                            (!isBid && c.working.trump != null)) ...[
+                          TrumpBanner(c: c),
+                          const SizedBox(height: 12),
+                        ],
+                        if (isBid) ...[
+                          StepStrip(c: c),
+                          const SizedBox(height: 12),
+                        ],
+                        // The trump is the caller's to pick, so the suits only
+                        // come out once the table has said whose call it is.
+                        if (isBid &&
+                            c.lockedTrump == null &&
+                            c.working.caller != null) ...[
+                          Text(s.trump, style: labelStyle()),
+                          const SizedBox(height: 8),
+                          TrumpRow(c: c),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                // The two actions sit at the foot of the panel, level with the
+                // stat row under the seats, rather than stacking under the
+                // strip and leaving the bottom of the screen bare.
                 allEqual
                     ? PrimaryButton(s.rebid, onTap: c.doubleAndRebid)
                     : PrimaryButton(
@@ -625,6 +664,7 @@ class EntryScreen extends StatelessWidget {
                 ),
                 // No sheet down here any more: it lives behind the tab at the
                 // top of the screen, where it can have the whole width.
+                const SizedBox(height: 12),
               ],
             ),
           ),

@@ -57,7 +57,6 @@ class SeatColumn extends StatelessWidget {
     final d = c.derived;
     final isDash = isBid && c.working.dash[index];
     final value = isBid ? c.working.bids[index] : c.working.tricks[index];
-    final unset = value == null;
 
     // The prominent badge: Caller / With / Dash. Once a seat has been pressed
     // as Caller that seat wears Caller and anyone matching it wears With;
@@ -115,7 +114,6 @@ class SeatColumn extends StatelessWidget {
             : null,
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           // Crown / koz row — fixed height so seats stay aligned when empty.
           RankMark(c: c, index: index, size: 26),
@@ -144,35 +142,22 @@ class SeatColumn extends StatelessWidget {
           const SizedBox(height: 4),
           // On the estimate screen the number is a read-out, not a target: it
           // is settled on the call panel, behind the buttons below.
+          // The number takes whatever height the card has spare, so the table
+          // fills the screen instead of stopping two thirds of the way down
+          // it. It scales down rather than overflowing on a short phone.
           if (isBid)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
-                style: numberStyle(
-                  size: 44,
-                  color: (unset || isDash) ? AppColors.faint : AppColors.gold,
-                ),
-              ),
-            )
+            Expanded(child: _Readout(value: value, isDash: isDash))
           else
             // Counting tricks is still one press: the number opens the pad and
             // the value is picked outright, never nudged.
-            _NumberTarget(
-              enabled: !isDash,
-              max: c.rules.tricks,
-              selected: value,
-              allow: (n) => c.canPick(index, n),
-              onPicked: (n) => c.setValue(index, n),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
-                  style: numberStyle(
-                    size: 44,
-                    color: (unset || isDash) ? AppColors.faint : AppColors.gold,
-                  ),
-                ),
+            Expanded(
+              child: _NumberTarget(
+                enabled: !isDash,
+                max: c.rules.tricks,
+                selected: value,
+                allow: (n) => c.canPick(index, n),
+                onPicked: (n) => c.setValue(index, n),
+                child: _Readout(value: value, isDash: isDash),
               ),
             ),
           // The seat that took exactly what it called: one press instead of
@@ -279,31 +264,29 @@ class SeatColumn extends StatelessWidget {
             // the call there, because the highest estimate simply takes it,
             // and a Color round cannot be dashed at all. That leaves the seat
             // with one thing to say, so Edit says it alone.
-            Row(
-              children: [
-                if (!c.isColorRound) ...[
+            // Three words will not sit side by side in a column this narrow
+            // on a phone — they came out as "Ca..." and "Da...". The call
+            // takes a line of its own and the other two share the one under it.
+            if (!c.isColorRound) ...[
+              _TagButton(
+                label: s.caller,
+                selected: chosenCaller == index,
+                enabled: !isDash,
+                onTap: () => CallPanel.show(context, c, index, asCaller: true),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
                   Expanded(
                     child: _TagButton(
-                      label: s.caller,
-                      selected: chosenCaller == index,
-                      enabled: !isDash,
+                      label: s.edit,
+                      selected: false,
+                      // Nothing to fix until the call and the trump are down.
+                      enabled: !isDash && c.canEstimate(index),
                       onTap: () =>
-                          CallPanel.show(context, c, index, asCaller: true),
+                          CallPanel.show(context, c, index, asCaller: false),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                ],
-                Expanded(
-                  child: _TagButton(
-                    label: s.edit,
-                    selected: false,
-                    // Nothing to fix until the call and the trump are down.
-                    enabled: !isDash && c.canEstimate(index),
-                    onTap: () =>
-                        CallPanel.show(context, c, index, asCaller: false),
-                  ),
-                ),
-                if (!c.isColorRound) ...[
                   const SizedBox(width: 4),
                   Expanded(
                     child: _TagButton(
@@ -314,10 +297,48 @@ class SeatColumn extends StatelessWidget {
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
+            ] else
+              // Nothing is called or dashed in a Color round, so Edit has the
+              // width to itself.
+              _TagButton(
+                label: s.edit,
+                selected: false,
+                enabled: !isDash && c.canEstimate(index),
+                onTap: () =>
+                    CallPanel.show(context, c, index, asCaller: false),
+              ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The seat's number, centred in whatever room the card has left. It is the
+/// one thing on the card read from across a table, so it takes the slack —
+/// and scales itself down rather than overflowing when there is none.
+class _Readout extends StatelessWidget {
+  final int? value;
+  final bool isDash;
+  const _Readout({required this.value, required this.isDash});
+
+  @override
+  Widget build(BuildContext context) {
+    final unset = value == null;
+    return Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            isDash ? '\u2014' : (unset ? '\u00b7' : '$value'),
+            style: numberStyle(
+              size: 44,
+              color: (unset || isDash) ? AppColors.faint : AppColors.gold,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -535,13 +556,17 @@ class _TagButton extends StatelessWidget {
             border: Border.all(color: AppColors.gold),
             borderRadius: BorderRadius.circular(7),
           ),
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: labelStyle(
-              size: 9,
-              color: selected ? AppColors.onGold : AppColors.gold,
+          // Scaled down rather than cut off. A seat column is narrow, and a
+          // label reading "Ca..." tells the table nothing at all.
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: labelStyle(
+                size: 9,
+                color: selected ? AppColors.onGold : AppColors.gold,
+              ).copyWith(letterSpacing: 0.6),
             ),
           ),
         ),

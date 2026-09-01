@@ -119,6 +119,10 @@ class Str {
   String get multiplier => _p('Multiplier', 'المضاعف');
   String get dashCall => _p('Dash call', 'داش كول');
 
+  /// The Super Call line. It stands in place of the round score, the tricks
+  /// and the Caller bonus, so it is labelled as the whole call, not a bonus.
+  String get superCall => _p('Super call', 'سوبر كول');
+
   // Home
   String get tagline =>
       _p('Pocket / Egyptian scoresheet', 'ورقة حساب مصرية');
@@ -127,6 +131,23 @@ class Str {
   String get called => _p('called', 'قدّر');
   String get king => _p('King', 'الملك');
   String get koz => _p('Koz', 'كوز');
+
+  // The end screen.
+  String get gameResult => _p('Game Result', 'نتيجة اللعبة');
+  String get biggestWin => _p('Biggest win', 'أكبر مكسب');
+  String get biggestLoss => _p('Biggest loss', 'أكبر خسارة');
+  String get roundsWon => _p('W', 'ف');
+  String get roundsLost => _p('L', 'خ');
+  String get leave => _p('Leave', 'خروج');
+  String get noRoundsPlayed => _p('Nothing was played', 'لم تُلعب أي جولة');
+
+  /// The place badge down the standings. Arabic takes the bare numeral: the
+  /// spelled-out ordinals are far too long for a badge this size.
+  String place(int n) {
+    if (ar) return '$n';
+    const suffix = {1: 'ST', 2: 'ND', 3: 'RD'};
+    return '$n${suffix[n] ?? 'TH'}';
+  }
 
   // Settings groups
   String get grpScoring => _p('Scoring', 'الحساب');

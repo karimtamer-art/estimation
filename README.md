@@ -46,6 +46,10 @@ scoring 26 on a made bid of 6, −22 on a miss, the risk landing on the last
 estimator, the all-miss ladder going ×2 then ×3. If you change a constant and a
 test goes red, that's the intended alarm.
 
+`test/super_call_test.dart` does the same for the super call: the square at
+every call from 8 to 13, the halved miss, the bonuses that still stack on it,
+and — just as important — that a call of 7 or less is left exactly as it was.
+
 ## Layout
 
 | File | What's in it |
@@ -72,6 +76,29 @@ total is multiplied by the round multiplier.
 | Sole winner / loser | +10 | −10 |
 | Dash call | +25 over / +33 under | −25 / −33 |
 
+**Super calls are the exception.** A call of 8 or more is scored on its own
+formula, which *replaces* the round score, the tricks and the Caller bonus
+rather than adding to them:
+
+| Call | Made it | Missed |
+|---|---|---|
+| 8 | +64 | −32 |
+| 9 | +81 | −40 |
+| 10 | +100 | −50 |
+| 11 | +121 | −60 |
+| 12 | +144 | −72 |
+| 13 | +169 | −84 |
+
+Made is `call²`; missed is `−call² ÷ 2`, rounded down. A miss is priced off the
+call alone — eating 7 on a called 8 costs the same −32 as eating nothing, so
+the tricks difference never enters it. Risk, the sole winner/loser bonus and
+the round multiplier still apply on top, which is why a super 8 taken alone is
+74 and a super 9 taken alone is 91.
+
+Turn the whole thing off with **Super call scores on its own formula** in
+settings and an 8 goes back to scoring +28 / −20 minus the difference, the way
+every other call does.
+
 **Derived, never chosen:**
 
 - **Caller** is the highest estimate. Anyone matching it is **With**. They score
@@ -90,6 +117,7 @@ Three values sit under "Confirm against the app" in settings because the
 published table doesn't spell them out:
 
 1. Does a loss subtract the trick *difference* or the *full estimate*?
+   (Super calls sidestep this — they are priced off the call.)
 2. Does a dash player also collect the ±10 round score?
 3. Does a dash player also collect the sole winner/loser bonus?
 

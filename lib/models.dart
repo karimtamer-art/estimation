@@ -72,8 +72,16 @@ extension ModeInfo on GameMode {
         }[this]!;
 
   /// Trump for round [index], or null when the caller chooses it.
-  Suit? fixedTrump(int index) =>
-      index < normalRounds ? null : kColorOrder[index - normalRounds];
+  ///
+  /// [index] is allowed to sit past the last round: the app asks what the
+  /// NEXT round is dealt under, and once the game is over there is no next
+  /// round. Answering with a range error there blanked the end screen, so the
+  /// end of the Color order is a null like any other round the caller owns.
+  Suit? fixedTrump(int index) {
+    if (index < normalRounds) return null;
+    final i = index - normalRounds;
+    return i < colorRounds ? kColorOrder[i] : null;
+  }
 }
 
 /// One line of a player's score breakdown, e.g. "Caller / With  +10".

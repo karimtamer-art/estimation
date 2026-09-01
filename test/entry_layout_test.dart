@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
+import 'package:estimation/screens.dart';
 import 'package:estimation/theme.dart';
 import 'package:estimation/widgets.dart';
 
@@ -187,7 +188,8 @@ void main() {
     expect(find.image(const AssetImage('assets/koz.png')), findsNWidgets(2));
   });
 
-  testWidgets('game over crowns the winner and kozzes the loser', (t) async {
+  testWidgets('the end screen ranks the table and names the two rounds worth '
+      'remembering', (t) async {
     SharedPreferences.setMockInitialValues({});
     t.view.physicalSize = const Size(1600, 720);
     t.view.devicePixelRatio = 2.0;
@@ -209,17 +211,40 @@ void main() {
     await t.pumpWidget(EstimationApp(controller: c));
     await t.pumpAndSettle();
 
-    // Sara took it, Omar wears it.
-    expect(find.text('Sara'), findsOneWidget);
-    expect(find.text('wins with 30 points'), findsOneWidget);
-    expect(find.text('Omar'), findsOneWidget);
-    expect(find.text('loses with -10 points'), findsOneWidget);
-    // Once in its panel, once over its column on the sheet below.
-    expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
-    expect(find.image(const AssetImage('assets/koz.png')), findsNWidgets(2));
+    // Scoped to the screen: the sheet behind the tab carries the same names.
+    final done = find.byType(DoneScreen);
+    Finder on(String text) =>
+        find.descendant(of: done, matching: find.text(text));
+
+    expect(on('Game Result'), findsOneWidget);
+    expect(on('Sara wins with 30 points'), findsOneWidget);
+
+    // Standings run best to worst, with the middle places numbered.
+    expect(on('2ND'), findsOneWidget);
+    expect(on('3RD'), findsOneWidget);
+    // Sara took it and Omar wears it, so neither is numbered.
+    expect(on('1ST'), findsNothing);
+    expect(on('4TH'), findsNothing);
+
+    // Three seats made their 3; Omar ate a fourth and did not.
+    expect(on('1W · 0L'), findsNWidgets(3));
+    expect(on('0W · 1L'), findsOneWidget);
+
+    // Each of the two turns up twice: once in the standings, once as the
+    // round it took.
+    expect(on('Sara'), findsNWidgets(2));
+    expect(on('Omar'), findsNWidgets(2));
+    expect(on('Biggest win'), findsOneWidget);
+    expect(on('+30'), findsOneWidget);
+    expect(on('Biggest loss'), findsOneWidget);
+
+    // The sheet is folded away behind its tab, so the standings rows are the
+    // only place either one is worn.
+    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    expect(find.image(const AssetImage('assets/koz.png')), findsOneWidget);
   });
 
-  testWidgets('a table level all the way across gets no koz', (t) async {
+  testWidgets('a table level all the way across crowns nobody', (t) async {
     SharedPreferences.setMockInitialValues({});
     t.view.physicalSize = const Size(1600, 720);
     t.view.devicePixelRatio = 2.0;
@@ -241,8 +266,16 @@ void main() {
     await t.pumpWidget(EstimationApp(controller: c));
     await t.pumpAndSettle();
 
-    // Everyone shares the crown; nobody is singled out for the koz.
-    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
+    final done = find.byType(DoneScreen);
+    Finder on(String text) =>
+        find.descendant(of: done, matching: find.text(text));
+
+    // Everyone shares the top, so it is said as a tie and every seat is
+    // numbered — no crown to hand out and nobody singled out for the koz.
+    expect(on('Karim & Ali & Sara & Omar tie at 10 points'), findsOneWidget);
+    expect(on('1ST'), findsOneWidget);
+    expect(on('4TH'), findsOneWidget);
+    expect(find.image(const AssetImage('assets/crown.png')), findsNothing);
     expect(find.image(const AssetImage('assets/koz.png')), findsNothing);
   });
 }

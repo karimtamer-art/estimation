@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'build_info.dart';
 import 'controller.dart';
 import 'models.dart';
+import 'scoring.dart';
+import 'strings.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -664,127 +666,274 @@ class DoneScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = c.s;
-    final totals = c.totals;
-    final best = totals.reduce((a, b) => a > b ? a : b);
-    final worst = totals.reduce((a, b) => a < b ? a : b);
-    final winners = <String>[];
-    final losers = <String>[];
-    for (var i = 0; i < totals.length; i++) {
-      if (totals[i] == best) winners.add(c.players[i]);
-      if (totals[i] == worst) losers.add(c.players[i]);
-    }
-    // A table level all the way across has no loser to point at.
-    final showKoz = losers.length < c.playerCount;
+    final g = summarize(c.rounds, c.playerCount);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 32),
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
       children: [
-        Text(s.gameOver, style: labelStyle()),
-        const SizedBox(height: 8),
-        // The trophy and the punishment, side by side and the same size, so
-        // the table sees both from wherever they are sitting.
+        Center(
+          child: Text(
+            s.gameResult,
+            style: const TextStyle(
+                fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.8),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Center(child: Text(_verdict(s, g), style: labelStyle(size: 10))),
+        const SizedBox(height: 12),
+        // The table on the left, what the game did on the right — the same
+        // split the entry screen uses, so the eye lands where it already was.
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: _EndPanel(
-                asset: 'assets/crown.png',
-                label: s.king,
-                color: AppColors.gold,
-                names: winners.join(' & '),
-                line: '${winners.length > 1 ? s.tieAt : s.winsWith} '
-                    '$best ${s.points}',
+              flex: 5,
+              child: Column(
+                children: [
+                  for (var place = 0; place < g.ranking.length; place++) ...[
+                    if (place > 0) const SizedBox(height: 6),
+                    _PlaceRow(c: c, g: g, seat: g.ranking[place], place: place),
+                  ],
+                ],
               ),
             ),
-            if (showKoz) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: _EndPanel(
-                  asset: 'assets/koz.png',
-                  label: s.koz,
-                  color: AppColors.red,
-                  names: losers.join(' & '),
-                  line: '${losers.length > 1 ? s.tiedLast : s.losesWith} '
-                      '$worst ${s.points}',
-                ),
-              ),
-            ],
+            const SizedBox(width: 12),
+            Expanded(flex: 4, child: _GameFacts(c: c, g: g)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Row(
           children: [
+            Expanded(
+              child: PrimaryButton(s.leave, secondary: true, onTap: c.goHome),
+            ),
+            const SizedBox(width: 8),
             Expanded(child: PrimaryButton(s.newGame, onTap: c.newGame)),
             const SizedBox(width: 8),
+            // The last round is still reachable from here: a number typed
+            // wrong on the final hand would otherwise be stuck on the sheet.
             PrimaryButton(s.undo, secondary: true, onTap: c.undoLast),
           ],
         ),
-        Scoreboard(c: c),
       ],
     );
   }
+
+  /// The one-line verdict under the title. A shared top has no single winner,
+  /// so it is said as a tie rather than pinned on whoever sits first.
+  String _verdict(Str s, GameSummary g) {
+    if (g.played == 0) return s.noRoundsPlayed;
+    final best = g.totals[g.ranking.first];
+    final names = [
+      for (var i = 0; i < g.totals.length; i++)
+        if (g.totals[i] == best) c.players[i],
+    ];
+    final verb = names.length > 1 ? s.tieAt : s.winsWith;
+    return '${names.join(' & ')} $verb $best ${s.points}';
+  }
 }
 
-/// Game over, and the koz goes up where nobody can miss it: the face as big as
-/// the panel allows, the name under it, and the score that earned it.
-/// Game over: one of the two verdicts, framed in its own colour. The crown and
-/// the koz are the same size on purpose — the table should read either from
-/// wherever they are sitting.
-class _EndPanel extends StatelessWidget {
-  final String asset;
-  final String label;
-  final Color color;
-  final String names;
-  final String line;
-  const _EndPanel({
-    required this.asset,
-    required this.label,
-    required this.color,
-    required this.names,
-    required this.line,
+/// One line of the standings: where the seat finished, who it was, how its
+/// rounds went, and what it ended on.
+class _PlaceRow extends StatelessWidget {
+  final GameController c;
+  final GameSummary g;
+  final int seat;
+  final int place;
+  const _PlaceRow({
+    required this.c,
+    required this.g,
+    required this.seat,
+    required this.place,
   });
 
   @override
   Widget build(BuildContext context) {
+    final s = c.s;
+    final isKing = seat == g.leader;
+    final isKoz = seat == g.laggard;
+    final total = g.totals[seat];
+    final accent =
+        isKing ? AppColors.gold : (isKoz ? AppColors.red : AppColors.line);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+      padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(14),
+        // The winner's line is lifted out of the list; everyone else sits flat.
+        color: isKing ? AppColors.gold.withOpacity(0.10) : AppColors.surface,
+        border: Border.all(color: accent),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Image.asset(
-            asset,
-            height: 118,
-            semanticLabel: label,
-            filterQuality: FilterQuality.medium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            names,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
-              color: color,
+          SizedBox(
+            width: 42,
+            child: Center(
+              // The crown and the koz stand in for the place they earned, so
+              // first and last are read as pictures, not as numbers.
+              child: isKing || isKoz
+                  ? Image.asset(
+                      isKing ? 'assets/crown.png' : 'assets/koz.png',
+                      height: 34,
+                      semanticLabel: isKing ? s.king : s.koz,
+                      filterQuality: FilterQuality.medium,
+                    )
+                  : Text(s.place(place + 1),
+                      style: labelStyle(size: 11, color: AppColors.dim)),
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  c.players[seat],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                    color: isKing ? AppColors.gold : AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '${g.won[seat]}${s.roundsWon} · ${g.lost[seat]}${s.roundsLost}',
+                  style: labelStyle(size: 9, color: AppColors.dim),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
-            line,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: labelStyle(size: 10, color: color),
+            '$total',
+            style: TextStyle(
+              fontFamily: kMono,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: total > 0
+                  ? AppColors.green
+                  : (total < 0 ? AppColors.red : AppColors.dim),
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// What the game itself did: how long it was, and the two rounds worth
+/// remembering afterwards.
+class _GameFacts extends StatelessWidget {
+  final GameController c;
+  final GameSummary g;
+  const _GameFacts({required this.c, required this.g});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = c.s;
+    final accent = c.mode.accent;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  c.mode.label(c.arabic).toUpperCase(),
+                  style: labelStyle(size: 10, color: c.mode.onAccent),
+                ),
+              ),
+              const Spacer(),
+              Text('${g.played} ${s.rounds}',
+                  style: labelStyle(size: 10, color: AppColors.dim)),
+            ],
+          ),
+          const Divider(color: AppColors.line, height: 20),
+          _Fact(
+            label: s.biggestWin,
+            name: g.bestSeat == null ? '—' : c.players[g.bestSeat!],
+            value: g.bestValue,
+            color: AppColors.green,
+          ),
+          const SizedBox(height: 10),
+          _Fact(
+            label: s.biggestLoss,
+            name: g.worstSeat == null ? '—' : c.players[g.worstSeat!],
+            value: g.worstValue,
+            color: AppColors.red,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A named round score: who took it and what it was worth.
+class _Fact extends StatelessWidget {
+  final String label;
+  final String name;
+  final int value;
+  final Color color;
+  const _Fact({
+    required this.label,
+    required this.name,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: labelStyle(size: 9)),
+        const SizedBox(height: 3),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              // A win is signed so the two lines cannot be misread for each
+              // other at a glance; a loss already carries its minus.
+              value > 0 ? '+$value' : '$value',
+              style: TextStyle(
+                fontFamily: kMono,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -834,8 +983,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _num('Minimum caller estimate', '', r.minCallerBid,
             (v) => r.minCallerBid = v),
         _num('Max dash calls per round', '', r.maxDash, (v) => r.maxDash = v),
-        _num('Super call minimum', 'unlocks trump in color rounds',
+        _num('Super call minimum', 'unlocks trump, and scores on the square',
             r.superCallMin, (v) => r.superCallMin = v),
+        _bool('Super call scores on its own formula',
+            'made +call\u00b2, missed \u2212call\u00b2/2, off = normal caller',
+            r.superCallOwnScore, (v) => r.superCallOwnScore = v),
+        _num('Super call miss divisor', 'a missed call costs call\u00b2 over this',
+            r.superCallLossDiv, (v) => r.superCallLossDiv = v),
         _bool('Nobody made it \u2192 round scores 0', '', r.allMissZero,
             (v) => r.allMissZero = v),
         _num('All passed \u2192 next round worth',

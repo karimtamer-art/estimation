@@ -12,6 +12,19 @@ class Rules {
   int maxDash;
   int superCallMin;
 
+  // A call at or above [superCallMin] is a Super Call. It does two unrelated
+  // things: it unlocks the trump in a Color round, and — when this is on — it
+  // is scored on its own formula instead of the Caller one.
+  //
+  //   made it  -> +call^2
+  //   missed   -> -(call^2 ~/ superCallLossDiv)
+  //
+  // The square REPLACES the round score, the tricks and the Caller bonus; a
+  // miss is priced off the call alone, never off how far the seat landed from
+  // it. Risk, the sole bonus and the round multiplier still apply on top.
+  bool superCallOwnScore;
+  int superCallLossDiv;
+
   // Scoring components
   int roundScore; // every player: win +n / loss -n
   int callerOrWith; // win +n / loss -n
@@ -50,6 +63,8 @@ class Rules {
     required this.minCallerBid,
     required this.maxDash,
     required this.superCallMin,
+    required this.superCallOwnScore,
+    required this.superCallLossDiv,
     required this.roundScore,
     required this.callerOrWith,
     required this.perRisk,
@@ -76,6 +91,8 @@ class Rules {
         minCallerBid: 4,
         maxDash: 2,
         superCallMin: 8,
+        superCallOwnScore: true,
+        superCallLossDiv: 2,
         roundScore: 10,
         callerOrWith: 10,
         perRisk: 10,
@@ -105,6 +122,8 @@ class Rules {
         'minCallerBid': minCallerBid,
         'maxDash': maxDash,
         'superCallMin': superCallMin,
+        'superCallOwnScore': superCallOwnScore,
+        'superCallLossDiv': superCallLossDiv,
         'roundScore': roundScore,
         'callerOrWith': callerOrWith,
         'perRisk': perRisk,
@@ -144,6 +163,8 @@ class Rules {
       minCallerBid: i('minCallerBid', d.minCallerBid),
       maxDash: i('maxDash', d.maxDash),
       superCallMin: i('superCallMin', d.superCallMin),
+      superCallOwnScore: b('superCallOwnScore', d.superCallOwnScore),
+      superCallLossDiv: i('superCallLossDiv', d.superCallLossDiv),
       roundScore: i('roundScore', d.roundScore),
       callerOrWith: i('callerOrWith', d.callerOrWith),
       perRisk: i('perRisk', d.perRisk),

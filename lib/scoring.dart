@@ -26,6 +26,11 @@ class Derived {
   /// True when the table over-estimated (total > tricks).
   final bool over;
 
+  /// Per player: true if this seat owns the call AND called high enough to
+  /// make it a Super Call, so it scores on the square instead of the Caller
+  /// components. Always all-false while [Rules.superCallOwnScore] is off.
+  final List<bool> superCall;
+
   const Derived({
     required this.total,
     required this.top,
@@ -33,6 +38,7 @@ class Derived {
     required this.riskIndex,
     required this.riskLevel,
     required this.over,
+    required this.superCall,
   });
 }
 
@@ -64,6 +70,18 @@ Derived derive(Round r, Rules rules) {
   final lvl = ((total - rules.tricks).abs() / 2).floor();
   final risk = (riskIdx >= 0 && !r.dash[riskIdx]) ? lvl : 0;
 
+  // A Super Call belongs to whoever owns the call. Caller and With hold the
+  // same number and the app has always scored them identically, so a With
+  // sitting on a Super Call is a Super Call too — splitting them would pay two
+  // seats wildly different amounts for the very same estimate.
+  final sup = List<bool>.generate(
+    r.bids.length,
+    (i) =>
+        rules.superCallOwnScore &&
+        cw[i] &&
+        (r.bids[i] ?? 0) >= rules.superCallMin,
+  );
+
   return Derived(
     total: total,
     top: top,
@@ -71,6 +89,7 @@ Derived derive(Round r, Rules rules) {
     riskIndex: riskIdx,
     riskLevel: risk,
     over: total > rules.tricks,
+    superCall: sup,
   );
 }
 
@@ -122,6 +141,21 @@ RoundResult scoreRound(Round r, Rules rules, Str s) {
         if (w && wins == 1) add(s.sole, rules.soleBonus);
         if (!w && wins == n - 1) add(s.soleLoser, -rules.soleBonus);
       }
+    } else if (d.superCall[i]) {
+      // The square stands in for the round score, the tricks and the Caller
+      // bonus all at once — none of the three are added on top of it. A miss
+      // is priced off the call alone, so eating 7 on a called 8 costs exactly
+      // what eating nothing costs.
+      final bid = r.bids[i] ?? 0;
+      final div = rules.superCallLossDiv < 1 ? 1 : rules.superCallLossDiv;
+      final square = bid * bid;
+      add(s.superCall, w ? square : -(square ~/ div));
+      if (i == d.riskIndex && d.riskLevel > 0) {
+        add('${s.risk} \u00d7${d.riskLevel}',
+            sign * rules.perRisk * d.riskLevel);
+      }
+      if (w && wins == 1) add(s.sole, rules.soleBonus);
+      if (!w && wins == n - 1) add(s.soleLoser, -rules.soleBonus);
     } else {
       final bid = r.bids[i] ?? 0;
       final eaten = r.tricks[i] ?? 0;
@@ -190,6 +224,120 @@ bool sameHighestCall(
     }
   }
   return top != null && sharing >= rules.sameHighestCallMin;
+}
+
+/// What the end screen has to say about a finished game. Read off the rounds
+/// themselves, so it costs nothing to keep and never disagrees with the sheet.
+class GameSummary {
+  /// Final score per seat.
+  final List<int> totals;
+
+  /// Seat indices, best total first. Ties keep the seating order.
+  final List<int> ranking;
+
+  /// Rounds each seat made its number in, and rounds it did not. A round the
+  /// table passed belongs to nobody and is counted in neither.
+  final List<int> won;
+  final List<int> lost;
+
+  /// The outright top and bottom of the table, or null while it is shared —
+  /// nobody wears the crown or the koz on a tie.
+  final int? leader;
+  final int? laggard;
+
+  /// The single biggest round score of the game and the seat that took it,
+  /// and the same for the worst. Null seats mean no round was played.
+  final int? bestSeat;
+  final int bestValue;
+  final int? worstSeat;
+  final int worstValue;
+
+  /// Rounds actually played, passes excluded.
+  final int played;
+
+  const GameSummary({
+    required this.totals,
+    required this.ranking,
+    required this.won,
+    required this.lost,
+    required this.leader,
+    required this.laggard,
+    required this.bestSeat,
+    required this.bestValue,
+    required this.worstSeat,
+    required this.worstValue,
+    required this.played,
+  });
+}
+
+/// Everything the end screen shows, worked out from the rounds alone.
+GameSummary summarize(List<Round> rounds, int n) {
+  final totals = List<int>.filled(n, 0);
+  final won = List<int>.filled(n, 0);
+  final lost = List<int>.filled(n, 0);
+  int? bestSeat, worstSeat;
+  var bestValue = 0, worstValue = 0;
+  var played = 0;
+
+  for (final r in rounds) {
+    if (r.skipped) continue;
+    played++;
+    for (var i = 0; i < n; i++) {
+      final score = i < r.scores.length ? r.scores[i] : 0;
+      totals[i] += score;
+
+      // Made it is the same question the engine asks: a dash wants nothing,
+      // everyone else wants exactly what they called.
+      final made = i < r.dash.length && r.dash[i]
+          ? (i < r.tricks.length && r.tricks[i] == 0)
+          : (i < r.tricks.length &&
+              i < r.bids.length &&
+              r.tricks[i] != null &&
+              r.tricks[i] == r.bids[i]);
+      made ? won[i]++ : lost[i]++;
+
+      // Strictly better/worse, so a tie leaves the first seat holding it.
+      if (bestSeat == null || score > bestValue) {
+        bestSeat = i;
+        bestValue = score;
+      }
+      if (worstSeat == null || score < worstValue) {
+        worstSeat = i;
+        worstValue = score;
+      }
+    }
+  }
+
+  // Ties broken by seat so the order is the same every time it is built.
+  final ranking = List<int>.generate(n, (i) => i)
+    ..sort((a, b) {
+      final byScore = totals[b].compareTo(totals[a]);
+      return byScore != 0 ? byScore : a.compareTo(b);
+    });
+
+  int? only(bool highest) {
+    if (played == 0) return null;
+    var mark = totals[0];
+    for (final v in totals) {
+      if (highest ? v > mark : v < mark) mark = v;
+    }
+    final holders = [for (var i = 0; i < n; i++) if (totals[i] == mark) i];
+    return holders.length == 1 ? holders.first : null;
+  }
+
+  return GameSummary(
+    totals: totals,
+    ranking: ranking,
+    won: won,
+    lost: lost,
+    leader: only(true),
+    laggard: only(false),
+    bestSeat: played == 0 ? null : bestSeat,
+    bestValue: played == 0 ? 0 : bestValue,
+    worstSeat: played == 0 ? null : worstSeat,
+    worstValue: played == 0 ? 0 : worstValue,
+    played: played,
+  );
 }
 
 class ChainResult {

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'controller.dart';
@@ -730,10 +728,23 @@ class TrumpRow extends StatelessWidget {
   }
 }
 
-/// Running scoreboard. Tap a row to edit that round.
+/// Running scoreboard, read the way the paper sheet is: every row carries each
+/// seat's running total, a ▲ or ▼ for whether it made its number, and the
+/// call it made — the Caller's with its trump, W on a With, R on the Risk,
+/// DASH on a dash. The +/- column says how far the calls sat from 13. The
+/// header keeps the names and the totals in view while the rounds scroll
+/// under it, and the sheet opens on the latest round. Tap a row to edit it.
+///
+/// Needs a bounded height: the rounds scroll inside it.
 class Scoreboard extends StatelessWidget {
   final GameController c;
-  const Scoreboard({super.key, required this.c});
+
+  /// Shown above round 1, scrolled to rather than in the way of the rounds.
+  final Widget? lead;
+  const Scoreboard({super.key, required this.c, this.lead});
+
+  static const double _roundW = 44;
+  static const double _diffW = 44;
 
   @override
   Widget build(BuildContext context) {
@@ -741,168 +752,314 @@ class Scoreboard extends StatelessWidget {
     final totals = c.totals;
     final best = totals.isEmpty ? 0 : totals.reduce((a, b) => a > b ? a : b);
 
-    TextStyle head() => labelStyle(size: 9);
+    // Running totals after each round, worked out once for the whole sheet.
+    // A Color round is found the way the game finds it: off the rounds
+    // actually played, so a passed round takes no colour.
+    final running = <List<int>>[];
+    final color = <bool>[];
+    final acc = List<int>.filled(c.playerCount, 0);
+    var played = 0;
+    for (final r in c.rounds) {
+      for (var k = 0; k < c.playerCount; k++) {
+        acc[k] += k < r.scores.length ? r.scores[k] : 0;
+      }
+      running.add(List<int>.from(acc));
+      color.add(!r.skipped && c.mode.fixedTrump(played) != null);
+      if (!r.skipped) played++;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 20),
-        Text(s.scoreboard, style: labelStyle()),
-        const SizedBox(height: 10),
-        // The sheet wears the standing too: crown over whoever is out front,
-        // koz over whoever is propping it up, on every screen that shows it.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            SizedBox(width: 40, child: Text('#', style: head())),
-            for (var i = 0; i < c.players.length; i++)
-              Expanded(
-                child: Column(
-                  children: [
-                    RankMark(c: c, index: i, size: 22),
-                    const SizedBox(height: 3),
-                    Text(c.players[i].toUpperCase(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: head()),
-                  ],
+        _header(totals, best),
+        const Divider(color: AppColors.line, height: 1, thickness: 1),
+        Expanded(
+          child: c.rounds.isEmpty
+              ? Center(
+                  child: Text(s.noRounds,
+                      style: labelStyle(color: AppColors.faint)),
+                )
+              // Reversed so it opens on the round just played; older rounds,
+              // and whatever leads the sheet, are a scroll up. Shrink-wrapped
+              // and held at the top so a short game sits under its header.
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: ListView(
+                    reverse: true,
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      for (var i = c.rounds.length - 1; i >= 0; i--)
+                        _row(i, running[i], color[i]),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(s.tapToEdit,
+                            textAlign: TextAlign.center,
+                            style: labelStyle(size: 9, color: AppColors.faint)),
+                      ),
+                      if (lead != null) lead!,
+                    ],
+                  ),
                 ),
-              ),
-          ],
         ),
-        const Divider(color: AppColors.line, height: 14),
-        if (c.rounds.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Text(s.noRounds,
-                textAlign: TextAlign.center,
-                style: labelStyle(color: AppColors.faint)),
-          ),
-        for (var i = 0; i < c.rounds.length; i++) _row(context, i),
-        const Divider(color: AppColors.line, height: 18),
-        Row(
-          children: [
-            SizedBox(width: 40, child: Text('\u03a3', style: head())),
-            for (var i = 0; i < totals.length; i++)
-              Expanded(
-                // Signed, and coloured by its sign: a seat can see whether it
-                // is up or down on the game without reading the number.
-                child: _TotalCell(
-                  value: totals[i],
-                  leading: c.rounds.isNotEmpty && totals[i] == best,
-                ),
-              ),
-          ],
-        ),
-        if (c.rounds.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(s.tapToEdit,
-              textAlign: TextAlign.center,
-              style: labelStyle(size: 9, color: AppColors.faint)),
-        ],
-        const SizedBox(height: 24),
       ],
     );
   }
 
-  Widget _row(BuildContext context, int i) {
-    final r = c.rounds[i];
-    // Who carried the Risk that round, and how heavy it was.
-    final d = derive(r, c.rules);
-    return InkWell(
-      onTap: () => c.editRound(i),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 40,
-              child: Row(
+  /// Names, the crown and koz, and the totals — the standing at a glance,
+  /// whichever round the sheet is scrolled to.
+  Widget _header(List<int> totals, int best) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          SizedBox(
+            width: _roundW,
+            child: Text('R',
+                textAlign: TextAlign.center, style: labelStyle(size: 11)),
+          ),
+          for (var i = 0; i < c.playerCount; i++)
+            Expanded(
+              child: Column(
                 children: [
-                  Text('${i + 1}',
-                      style: labelStyle(size: 11, color: AppColors.faint)),
-                  if (r.mult > 1)
-                    Container(
-                      margin: const EdgeInsets.only(left: 3),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 3, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold,
-                        borderRadius: BorderRadius.circular(2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // The seat's colour, the same one its line wears on
+                      // the graph.
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                            color: seatColor(i), shape: BoxShape.circle),
                       ),
-                      child: Text('\u00d7${r.mult}',
-                          style: const TextStyle(
-                              fontFamily: kMono,
-                              fontSize: 8,
-                              color: AppColors.onGold)),
-                    ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(c.players[i].toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: labelStyle(size: 11, color: AppColors.text)),
+                      ),
+                      const SizedBox(width: 4),
+                      RankMark(c: c, index: i, size: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  _TotalCell(
+                    value: i < totals.length ? totals[i] : 0,
+                    leading: c.rounds.isNotEmpty &&
+                        i < totals.length &&
+                        totals[i] == best,
+                  ),
                 ],
               ),
             ),
-            for (var k = 0; k < c.playerCount; k++)
+          SizedBox(
+            width: _diffW,
+            child: Text('+/-',
+                textAlign: TextAlign.center, style: labelStyle(size: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(int i, List<int> running, bool isColor) {
+    final r = c.rounds[i];
+    final d = derive(r, c.rules);
+    // The seat that holds the call: the one pressed, or the first on the top
+    // number. Anyone else on that number is its With.
+    final caller = r.caller ?? d.callerOrWith.indexWhere((x) => x);
+
+    return InkWell(
+      onTap: () => c.editRound(i),
+      child: Container(
+        height: 46,
+        decoration: BoxDecoration(
+          color: i.isEven ? AppColors.surface.withOpacity(0.55) : null,
+          // A passed round is ruled through in red, as on the paper sheet.
+          border: r.skipped
+              ? const Border(
+                  bottom: BorderSide(color: AppColors.red, width: 1.5))
+              : null,
+        ),
+        child: Row(
+          children: [
+            SizedBox(width: _roundW, child: _roundCell(i, r, isColor)),
+            if (r.skipped)
               Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      _scoreText(r, k),
-                      style: TextStyle(
-                        fontFamily: kMono,
-                        fontSize: 12,
-                        color: _scoreColor(r, k),
-                      ),
-                    ),
-                    _detail(r, k,
-                        risk:
-                            (!r.skipped && d.riskIndex == k && d.riskLevel > 0)
-                                ? c.s.riskLabel(d.riskLevel)
-                                : null),
-                  ],
+                child: Text(c.s.passedRow,
+                    textAlign: TextAlign.center,
+                    style: labelStyle(size: 10, color: AppColors.red)),
+              )
+            else
+              for (var k = 0; k < c.playerCount; k++)
+                Expanded(
+                  child: _seatCell(r, d, k, running[k],
+                      isCaller: k == caller,
+                      isWith: k != caller && d.callerOrWith[k]),
                 ),
-              ),
+            SizedBox(
+              width: _diffW,
+              child: r.skipped
+                  ? const SizedBox.shrink()
+                  : Text(
+                      signed(d.total - c.rules.tricks),
+                      textAlign: TextAlign.center,
+                      style: numberStyle(size: 14, color: AppColors.dim),
+                    ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  String _scoreText(Round r, int k) {
-    if (k >= r.scores.length) return '0';
-    final v = r.scores[k];
-    return v > 0 ? '+$v' : '$v';
-  }
-
-  Color _scoreColor(Round r, int k) {
-    if (k >= r.scores.length) return AppColors.dim;
-    final v = r.scores[k];
-    if (v > 0) return AppColors.green;
-    if (v < 0) return AppColors.red;
-    return AppColors.dim;
-  }
-
-  /// Estimate → tricks for one seat, with the Risk tag (1R / 2R) appended in
-  /// red when that seat carried it.
-  Widget _detail(Round r, int k, {String? risk}) {
-    const base =
-        TextStyle(fontFamily: kMono, fontSize: 9, color: AppColors.faint);
-    if (r.skipped) return const Text('—', style: base);
-    final bid = r.dash[k] ? 'dash' : '${r.bids[k] ?? '-'}';
-    return Text.rich(
-      TextSpan(
-        style: base,
-        children: [
-          TextSpan(text: '$bid→${r.tricks[k] ?? '-'}'),
-          if (risk != null)
-            TextSpan(
-              text: ' $risk',
-              style: const TextStyle(
-                  color: AppColors.red, fontWeight: FontWeight.w700),
+  /// The round's number — or, for a Color round, the trump it was dealt
+  /// under — with the multiplier it was played at.
+  Widget _roundCell(int i, Round r, bool isColor) {
+    final trump = r.trump;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        isColor && trump != null
+            ? Text(trump.symbol,
+                style: TextStyle(
+                    fontSize: 18,
+                    color: trump.isRed ? AppColors.red : AppColors.text))
+            : Text('${i + 1}',
+                style: numberStyle(size: 15, color: AppColors.dim)),
+        if (r.mult > 1)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppColors.gold,
+              borderRadius: BorderRadius.circular(2),
             ),
+            child: Text('×${r.mult}',
+                style: const TextStyle(
+                    fontFamily: kMono, fontSize: 9, color: AppColors.onGold)),
+          ),
+      ],
+    );
+  }
+
+  /// One seat on one round: ▲/▼, its running total and what the round was
+  /// worth, then the call it made.
+  Widget _seatCell(Round r, Derived d, int k, int total,
+      {required bool isCaller, required bool isWith}) {
+    final score = k < r.scores.length ? r.scores[k] : 0;
+    final made = r.dash[k] ? r.tricks[k] == 0 : r.tricks[k] == r.bids[k];
+    final risk = d.riskIndex == k && d.riskLevel > 0;
+
+    return Container(
+      decoration: const BoxDecoration(
+        border: BorderDirectional(start: BorderSide(color: AppColors.line)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          Text(made ? '▲' : '▼',
+              style: TextStyle(
+                  fontSize: 11, color: made ? AppColors.green : AppColors.red)),
+          const SizedBox(width: 5),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text('$total',
+                      style: numberStyle(size: 19, color: AppColors.text)),
+                  const SizedBox(width: 5),
+                  Text(signed(score),
+                      style: numberStyle(size: 11, color: signColor(score))),
+                ],
+              ),
+            ),
+          ),
+          _CallChip(
+            call: r.dash[k] ? null : r.bids[k],
+            trump: isCaller ? r.trump : null,
+            isWith: isWith,
+            risk: risk ? c.s.riskLabel(d.riskLevel) : null,
+          ),
         ],
       ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// What a seat called on one round, in the sheet's call column: the number,
+/// the trump beside the Caller's, W on a With, the Risk in red, or DASH.
+class _CallChip extends StatelessWidget {
+  /// Null for a dash.
+  final int? call;
+  final Suit? trump;
+  final bool isWith;
+  final String? risk;
+  const _CallChip(
+      {required this.call, this.trump, this.isWith = false, this.risk});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget badge(String text, Color bg, Color fg) => Container(
+          margin: const EdgeInsetsDirectional.only(start: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+          decoration:
+              BoxDecoration(color: bg, borderRadius: BorderRadius.circular(3)),
+          child: Text(text,
+              style: TextStyle(
+                  fontFamily: kMono,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: fg)),
+        );
+
+    final t = trump;
+    final n = call;
+    // Boxed, so the call reads as this seat's and not the next one's.
+    return Container(
+      constraints: const BoxConstraints(minWidth: 34),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.raise,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (n == null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.dim),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: const Text('DASH',
+                  style: TextStyle(
+                      fontFamily: kMono, fontSize: 9, color: AppColors.text)),
+            )
+          else ...[
+            Text('$n', style: numberStyle(size: 16, color: AppColors.text)),
+            if (t != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 2),
+                child: Text(t.symbol,
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: t.isRed ? AppColors.red : AppColors.text)),
+              ),
+          ],
+          if (isWith) badge('W', AppColors.blue, AppColors.onBlue),
+          if (risk != null) badge(risk!, AppColors.red, AppColors.onRed),
+        ],
+      ),
     );
   }
 }
@@ -1240,20 +1397,19 @@ class _FanPainter extends CustomPainter {
 
 // ------------------------------------------------------------- dash window
 
-/// How long the table has to declare a dash at the top of a round.
-const int kDashWindowSeconds = 15;
-
 /// Opens as each round starts. A dash is called out loud before anyone
-/// estimates, so the round holds still for a moment and offers the four seats
-/// — tap whoever says it. Closes itself when the countdown runs out.
-class DashWindow extends StatefulWidget {
+/// estimates, so the round holds still and offers the four seats — tap
+/// whoever says it. No clock: it stays up until the table picks and presses
+/// Done, or presses Skip because nobody dashed.
+class DashWindow extends StatelessWidget {
   final GameController c;
   const DashWindow({super.key, required this.c});
 
   static Future<void> show(BuildContext context, GameController c) {
     return showDialog<void>(
       context: context,
-      barrierDismissible: true,
+      // Only Done or Skip closes it, so a stray tap can't wave the dash away.
+      barrierDismissible: false,
       barrierColor: Colors.black.withOpacity(0.62),
       // The dialog is pushed above the Directionality that wraps the app, so
       // it has to be told the language's direction itself.
@@ -1265,36 +1421,7 @@ class DashWindow extends StatefulWidget {
   }
 
   @override
-  State<DashWindow> createState() => _DashWindowState();
-}
-
-class _DashWindowState extends State<DashWindow> {
-  int left = kDashWindowSeconds;
-  Timer? _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      // Unmounted means the dialog is already gone — nothing left to close.
-      if (!mounted) return;
-      setState(() => left--);
-      if (left <= 0) {
-        _tick?.cancel();
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final c = widget.c;
     final s = c.s;
     return AnimatedBuilder(
       animation: c,
@@ -1302,7 +1429,6 @@ class _DashWindowState extends State<DashWindow> {
         final dashed = c.working.dash;
         final count = dashed.where((x) => x).length;
         final full = count >= c.rules.maxDash;
-        final urgent = left <= 5;
 
         return Dialog(
           backgroundColor: AppColors.surface,
@@ -1320,44 +1446,13 @@ class _DashWindowState extends State<DashWindow> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              s.dashWindow,
-                              style: const TextStyle(
-                                  fontSize: 21, fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(s.dashWindowHint, style: labelStyle(size: 10)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // The clock, in the same mono as every other number.
-                      Text(
-                        '$left',
-                        style: numberStyle(
-                          size: 40,
-                          color: urgent ? AppColors.red : AppColors.gold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    s.dashWindow,
+                    style: const TextStyle(
+                        fontSize: 21, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: left / kDashWindowSeconds,
-                      minHeight: 4,
-                      backgroundColor: AppColors.raise,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                          urgent ? AppColors.red : AppColors.gold),
-                    ),
-                  ),
+                  const SizedBox(height: 3),
+                  Text(s.dashWindowHint, style: labelStyle(size: 10)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -1392,7 +1487,7 @@ class _DashWindowState extends State<DashWindow> {
                         ),
                       ),
                       _DialogButton(
-                        label: s.done,
+                        label: count == 0 ? s.skip : s.done,
                         onTap: () => Navigator.of(context).pop(),
                       ),
                     ],
@@ -1913,10 +2008,10 @@ class _ScoreDrawerState extends State<ScoreDrawer>
     final c = widget.c;
     return LayoutBuilder(
       builder: (context, box) {
-        // Only as deep as the sheet it carries: the graph, the header and a
-        // row per round, up to nearly the whole screen once a long game fills
+        // Only as deep as the sheet it carries: the header and a row per
+        // round, with the graph a scroll above them, up to nearly the whole screen once a long game fills
         // it. Anything past that scrolls inside the panel.
-        final wanted = 371.0 + c.rounds.length * 37.0;
+        final wanted = 300.0 + c.rounds.length * 46.0;
         final h = wanted.clamp(240.0, box.maxHeight * 0.9);
         _panelHeight = h;
         return AnimatedBuilder(
@@ -2165,15 +2260,13 @@ class _MultBadgeState extends State<MultBadge>
   }
 }
 
-/// What the tab pulls down: the graph over the running sheet.
+/// What the tab pulls down: the running sheet, the graph above round 1.
 class _ScorePanel extends StatelessWidget {
   final GameController c;
   const _ScorePanel({required this.c});
 
   @override
   Widget build(BuildContext context) {
-    final s = c.s;
-    final totals = c.totals;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.bg,
@@ -2194,74 +2287,21 @@ class _ScorePanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 10, 0),
-              child: Row(
-                children: [
-                  Text(s.scoreboard, style: labelStyle()),
-                  const Spacer(),
-                  for (var i = 0; i < c.playerCount; i++) ...[
-                    _LegendChip(
-                      name: c.players[i],
-                      total: i < totals.length ? totals[i] : 0,
-                      color: seatColor(i),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: SizedBox(height: 132, child: ScoreGraph(c: c)),
-            ),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [Scoreboard(c: c)],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: Scoreboard(
+                  c: c,
+                  lead: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: SizedBox(height: 132, child: ScoreGraph(c: c)),
+                  ),
+                ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-/// One seat in the graph's key: its colour, its name, and where it stands —
-/// green when it is up on the game, red when it is down.
-class _LegendChip extends StatelessWidget {
-  final String name;
-  final int total;
-  final Color color;
-  const _LegendChip(
-      {required this.name, required this.total, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 5),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 64),
-          child: Text(name.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: labelStyle(size: 9)),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          signed(total),
-          style: numberStyle(size: 12, color: signColor(total)),
-        ),
-      ],
     );
   }
 }

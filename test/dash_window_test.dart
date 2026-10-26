@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
-import 'package:estimation/widgets.dart';
 
 /// Starts a game and lets the dash window come up, the way the app does it:
 /// the round raises the flag, the next frame opens the dialog.
@@ -26,13 +25,10 @@ void main() {
   testWidgets('every round opens with the dash window', (t) async {
     await startGame(t);
     expect(find.text('Wait for dash'), findsOneWidget);
-    expect(find.text('$kDashWindowSeconds'), findsOneWidget);
     // Every seat is offered by name.
     for (final name in ['Karim', 'Ali', 'Sara', 'Omar']) {
       expect(find.text(name), findsWidgets);
     }
-    await t.pump(const Duration(seconds: kDashWindowSeconds + 1));
-    await t.pumpAndSettle();
   });
 
   testWidgets('tapping a seat dashes it, and Done closes the window',
@@ -50,16 +46,25 @@ void main() {
     expect(c.working.dash[2], isTrue);
   });
 
-  testWidgets('the countdown ticks and closes the window on its own',
-      (t) async {
-    await startGame(t);
+  testWidgets('no clock: the window waits until the table answers', (t) async {
+    final c = await startGame(t);
 
-    await t.pump(const Duration(seconds: 1));
-    expect(find.text('${kDashWindowSeconds - 1}'), findsOneWidget);
+    // A minute on, nobody has pressed anything, and it is still up.
+    await t.pump(const Duration(minutes: 1));
+    await t.pumpAndSettle();
+    expect(find.text('Wait for dash'), findsOneWidget);
 
-    await t.pump(const Duration(seconds: kDashWindowSeconds - 1));
+    // A tap outside does not close it either.
+    await t.tapAt(const Offset(5, 5));
+    await t.pumpAndSettle();
+    expect(find.text('Wait for dash'), findsOneWidget);
+
+    // With nobody dashed the button offers Skip.
+    expect(find.text('Done'), findsNothing);
+    await t.tap(find.text('Skip'));
     await t.pumpAndSettle();
     expect(find.text('Wait for dash'), findsNothing);
+    expect(c.working.dash.any((x) => x), isFalse);
   });
 
   testWidgets('the window honours the dash limit', (t) async {
@@ -75,9 +80,6 @@ void main() {
     await t.pumpAndSettle();
 
     expect(c.working.dash, [true, true, false, false]);
-
-    await t.pump(const Duration(seconds: kDashWindowSeconds + 1));
-    await t.pumpAndSettle();
   });
 
   testWidgets('color rounds open without the dash window', (t) async {

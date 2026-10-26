@@ -50,9 +50,12 @@ class Str {
   String get houseRule => _p('house rule', 'قاعدة بيتية');
   String get settings => _p('Settings', 'الإعدادات');
   String get done => _p('Done', 'تم');
+  String get skip => _p('Skip', 'تخطي');
   String get defaults => _p('Defaults', 'الافتراضي');
   String get scoreboard => _p('Scoreboard', 'النتائج');
   String get noRounds => _p('No rounds yet', 'لا جولات بعد');
+  String get passedRow =>
+      _p('PASSED — next round doubled', 'باس — الجولة الجاية بالضعف');
   String get tapToEdit => _p('Tap a round to edit it', 'اضغط جولة لتعديلها');
   String get gameOver => _p('Game over', 'انتهت اللعبة');
   String get winsWith => _p('wins with', 'يفوز بـ');

@@ -692,12 +692,9 @@ class ResultScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (c.lastMessage != null) Banner_(c.lastMessage!),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [Scoreboard(c: c)],
-            ),
-          ),
+          const SizedBox(height: 10),
+          Expanded(child: Scoreboard(c: c)),
+          const SizedBox(height: 10),
           PrimaryButton(s.continue_, onTap: c.continueAfterResult),
         ],
       ),

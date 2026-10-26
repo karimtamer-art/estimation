@@ -1010,7 +1010,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: const TextStyle(
                 fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -1)),
         _group(s.grpScoring),
-        _num('Round score', 'every player, win / loss', r.roundScore,
+        _num('Round score', 'every player who makes it', r.roundScore,
             (v) => r.roundScore = v),
         _num('Caller or With', '', r.callerOrWith, (v) => r.callerOrWith = v),
         _num('Per risk level', 'Double Risk = twice this', r.perRisk,
@@ -1023,6 +1023,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _group(s.grpConfirm),
         _bool('Loss uses trick difference', 'off = subtract full estimate',
             r.lossTricksIsDiff, (v) => r.lossTricksIsDiff = v),
+        _bool('Miss also loses round score', 'off = a miss costs only the difference',
+            r.roundScoreOnLoss, (v) => r.roundScoreOnLoss = v),
         _bool('Dash also gets round score', '', r.dashStacksRound,
             (v) => r.dashStacksRound = v),
         _bool('Dash also gets sole bonus', '', r.dashStacksSole,

@@ -42,7 +42,7 @@ flutter test
 ```
 
 `test/scoring_test.dart` pins the engine against worked examples — the caller
-scoring 26 on a made bid of 6, −22 on a miss, the risk landing on the last
+scoring 26 on a made bid of 6, −12 on a miss, the risk landing on the last
 estimator, the all-miss ladder going ×2 then ×3. If you change a constant and a
 test goes red, that's the intended alarm.
 
@@ -148,5 +148,9 @@ published table doesn't spell them out:
 2. Does a dash player also collect the ±10 round score?
 3. Does a dash player also collect the sole winner/loser bonus?
 
-The test for #1: call 6, eat 4. **−22** means difference (current default),
-**−26** means full estimate.
+The test for #1: call 6, eat 4. **−12** means difference (current default),
+**−16** means full estimate.
+
+Settled from Pocket Estimation score sheets: a miss does **not** cost the ±10
+round score — only the difference (plus Caller/With, Risk and sole loser).
+The old behaviour is the "Miss also loses round score" switch.

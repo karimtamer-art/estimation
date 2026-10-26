@@ -146,14 +146,14 @@ void main() {
 
   test('a call under the threshold is untouched by the super formula', () {
     // The worked examples from the README, unchanged: call 6 and make it is
-    // still 26, call 6 and eat 4 is still -22.
+    // still 26, call 6 and eat 4 is still -12.
     final made = call(6, 6, others: [3, 3, 2], othersEat: [3, 2, 2]);
     final madeOut = scoreRound(made, rules, s);
     expect(madeOut.derived.superCall[0], isFalse);
     expect(madeOut.scores[0], 26);
 
     final missed = call(6, 4, others: [3, 3, 2], othersEat: [3, 4, 2]);
-    expect(scoreRound(missed, rules, s).scores[0], -22);
+    expect(scoreRound(missed, rules, s).scores[0], -12);
   });
 
   test('a seven is the last normal call, an eight is the first super one', () {
@@ -177,7 +177,7 @@ void main() {
     final out = scoreRound(r, rules, s);
     expect(out.derived.superCall, [true, false, false, false]);
     expect(out.scores[0], 81);
-    expect(out.scores[1], -26); // -10, the -6 difference, and the sole loser
+    expect(out.scores[1], -16); // the -6 difference and the sole loser
   });
 
   test('a dash is still a dash, never a super call', () {
@@ -216,7 +216,7 @@ void main() {
     expect(out.scores[0], 28); // 10 + 8 + 10, the way it scored before
 
     final missed = call(8, 6, others: [2, 1, 1], othersEat: [2, 1, 4]);
-    expect(scoreRound(missed, off, s).scores[0], -22); // -10, -2, -10
+    expect(scoreRound(missed, off, s).scores[0], -12); // -2, -10
   });
 
   test('the breakdown shows one super line, no round score and no caller', () {

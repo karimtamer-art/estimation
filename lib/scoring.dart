@@ -159,7 +159,9 @@ RoundResult scoreRound(Round r, Rules rules, Str s) {
     } else {
       final bid = r.bids[i] ?? 0;
       final eaten = r.tricks[i] ?? 0;
-      add(s.roundScore, sign * rules.roundScore);
+      if (w || rules.roundScoreOnLoss) {
+        add(s.roundScore, sign * rules.roundScore);
+      }
       add(
         s.tricksAmount,
         w ? bid : -(rules.lossTricksIsDiff ? (bid - eaten).abs() : bid),

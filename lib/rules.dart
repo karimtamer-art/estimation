@@ -26,7 +26,8 @@ class Rules {
   int superCallLossDiv;
 
   // Scoring components
-  int roundScore; // every player: win +n / loss -n
+  int roundScore; // every player who makes it: +n
+  bool roundScoreOnLoss; // a miss also costs -roundScore (off: only the difference)
   int callerOrWith; // win +n / loss -n
   int perRisk; // win +n / loss -n, per risk level
   int soleBonus; // +n only winner, -n only loser
@@ -66,6 +67,7 @@ class Rules {
     required this.superCallOwnScore,
     required this.superCallLossDiv,
     required this.roundScore,
+    required this.roundScoreOnLoss,
     required this.callerOrWith,
     required this.perRisk,
     required this.soleBonus,
@@ -94,6 +96,9 @@ class Rules {
         superCallOwnScore: true,
         superCallLossDiv: 2,
         roundScore: 10,
+        // Off, as Pocket Estimation plays it: a seat that misses its number
+        // pays only how far it landed, so a called 1 that eats 2 costs -1.
+        roundScoreOnLoss: false,
         callerOrWith: 10,
         perRisk: 10,
         soleBonus: 10,
@@ -125,6 +130,7 @@ class Rules {
         'superCallOwnScore': superCallOwnScore,
         'superCallLossDiv': superCallLossDiv,
         'roundScore': roundScore,
+        'roundScoreOnLoss': roundScoreOnLoss,
         'callerOrWith': callerOrWith,
         'perRisk': perRisk,
         'soleBonus': soleBonus,
@@ -166,6 +172,7 @@ class Rules {
       superCallOwnScore: b('superCallOwnScore', d.superCallOwnScore),
       superCallLossDiv: i('superCallLossDiv', d.superCallLossDiv),
       roundScore: i('roundScore', d.roundScore),
+      roundScoreOnLoss: b('roundScoreOnLoss', d.roundScoreOnLoss),
       callerOrWith: i('callerOrWith', d.callerOrWith),
       perRisk: i('perRisk', d.perRisk),
       soleBonus: i('soleBonus', d.soleBonus),

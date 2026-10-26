@@ -36,11 +36,25 @@ void main() {
     expect(out.scores[0], 26);
   });
 
-  test('caller missing costs round score + difference + caller penalty', () {
-    // Caller bid 6, ate 4 -> -10 -2 -10 = -22
+  test('caller missing costs the difference + caller penalty', () {
+    // Caller bid 6, ate 4 -> -2 -10 = -12. No round score on a miss.
     final r = build(bids: [6, 3, 3, 2], tricks: [4, 3, 4, 2]);
     final out = scoreRound(r, rules, s);
-    expect(out.scores[0], -22);
+    expect(out.scores[0], -12);
+  });
+
+  test('a plain miss costs only how far the seat landed', () {
+    // Pocket Estimation, round 6 of the Bot 2 game: calls 2, 1, 7, 2 (total
+    // 12), Bot 2 called 1 and missed by one, the caller missed 7 by two.
+    final r = build(bids: [2, 1, 7, 2], tricks: [2, 2, 5, 2], caller: 2);
+    final out = scoreRound(r, rules, s);
+    expect(out.scores, [12, -1, -12, 12]);
+  });
+
+  test('the round score on a miss comes back with the setting', () {
+    final old = Rules.defaults()..roundScoreOnLoss = true;
+    final r = build(bids: [6, 3, 3, 2], tricks: [4, 3, 4, 2]);
+    expect(scoreRound(r, old, s).scores[0], -22);
   });
 
   test('With scores identically to the caller', () {

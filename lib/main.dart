@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'controller.dart';
 import 'models.dart';
 import 'screens.dart';
 import 'theme.dart';
+import 'ui/components.dart';
+import 'ui/screens/home.dart';
+import 'ui/screens/length.dart';
+import 'ui/round.dart';
+import 'ui/screens/bid.dart';
+import 'ui/screens/calls.dart';
+import 'ui/screens/dash.dart';
+import 'ui/screens/players.dart';
+import 'ui/screens/scoreboard.dart';
+import 'ui/screens/settings.dart';
+import 'ui/screens/tricks.dart';
+import 'ui/tokens.dart';
 import 'widgets.dart';
 
 Future<void> main() async {
@@ -17,6 +30,12 @@ Future<void> main() async {
   ]);
   final controller = GameController();
   await controller.load();
+  // The table plays for an hour; the phone should not dim and lock on it.
+  try {
+    await WakelockPlus.toggle(enable: controller.keepAwake);
+  } catch (_) {
+    // Not every platform can hold the screen; play on regardless.
+  }
   runApp(EstimationApp(controller: controller));
 }
 
@@ -29,6 +48,7 @@ class EstimationApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        Haptics.on = controller.vibrate;
         return MaterialApp(
           title: 'Estimation',
           debugShowCheckedModeBanner: false,
@@ -62,10 +82,16 @@ class _HomeShellState extends State<HomeShell> {
     // A fresh round raises the dash flag; open the window once the frame it
     // was raised in is on screen. takeDashPrompt lowers it, so the rebuilds
     // that follow cannot stack a second dialog on top.
-    if (c.dashPromptPending) {
+    if (c.dashPromptPending && c.screen == Screen.bid) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (c.takeDashPrompt()) DashWindow.show(context, c);
+        if (c.takeDashPrompt()) DashModal.show(context, c);
+      });
+    }
+    // The tip pointing at the round tile is for the first game only.
+    if (c.screen == Screen.done && !c.seenScoreHint) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) c.markScoreHintSeen();
       });
     }
     // The round counter belongs to a game still being played. Setup has no
@@ -84,7 +110,34 @@ class _HomeShellState extends State<HomeShell> {
 
     // Home carries its own language button and needs the full frame.
     if (c.screen == Screen.home) {
-      return Scaffold(body: SafeArea(child: HomeScreen(c: c)));
+      return Scaffold(
+        body: FeltBackground(
+          felt: Felt.values[c.felt % Felt.values.length],
+          child: SafeArea(child: HomeView(c: c)),
+        ),
+      );
+    }
+    // Screens already redrawn in the new style bring their own header.
+    if (c.screen == Screen.setup) {
+      return Scaffold(body: LengthView(c: c));
+    }
+    if (c.screen == Screen.setupPlayers) {
+      return Scaffold(body: PlayersView(c: c));
+    }
+    if (c.screen == Screen.bid && phaseOf(c) == RoundPhase.bid) {
+      return Scaffold(body: BidView(key: ValueKey(roundNumber(c)), c: c));
+    }
+    if (c.screen == Screen.bid && phaseOf(c) == RoundPhase.calls) {
+      return Scaffold(body: CallsView(key: ValueKey(roundNumber(c)), c: c));
+    }
+    if (c.screen == Screen.tricks) {
+      return Scaffold(body: TricksView(c: c));
+    }
+    if (c.screen == Screen.result || c.screen == Screen.done) {
+      return Scaffold(body: ScoreboardView(c: c));
+    }
+    if (c.screen == Screen.settings) {
+      return Scaffold(body: SettingsView(c: c));
     }
 
     return Scaffold(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,7 +24,7 @@ Future<GameController> startGame(WidgetTester t) async {
 void main() {
   testWidgets('every round opens with the dash window', (t) async {
     await startGame(t);
-    expect(find.text('Wait for dash'), findsOneWidget);
+    expect(find.text('WAIT FOR DASH!'), findsOneWidget);
     // Every seat is offered by name.
     for (final name in ['Karim', 'Ali', 'Sara', 'Omar']) {
       expect(find.text(name), findsWidgets);
@@ -35,13 +35,13 @@ void main() {
       (t) async {
     final c = await startGame(t);
 
-    await t.tap(find.widgetWithText(InkWell, 'Sara').last);
+    await t.tap(find.text('Sara').last);
     await t.pumpAndSettle();
     expect(c.working.dash[2], isTrue);
 
-    await t.tap(find.text('Done'));
+    await t.tap(find.text('DONE'));
     await t.pumpAndSettle();
-    expect(find.text('Wait for dash'), findsNothing);
+    expect(find.text('WAIT FOR DASH!'), findsNothing);
     // The dash survives the window closing — the seat shows it on the sheet.
     expect(c.working.dash[2], isTrue);
   });
@@ -52,18 +52,18 @@ void main() {
     // A minute on, nobody has pressed anything, and it is still up.
     await t.pump(const Duration(minutes: 1));
     await t.pumpAndSettle();
-    expect(find.text('Wait for dash'), findsOneWidget);
+    expect(find.text('WAIT FOR DASH!'), findsOneWidget);
 
     // A tap outside does not close it either.
     await t.tapAt(const Offset(5, 5));
     await t.pumpAndSettle();
-    expect(find.text('Wait for dash'), findsOneWidget);
+    expect(find.text('WAIT FOR DASH!'), findsOneWidget);
 
     // With nobody dashed the button offers Skip.
-    expect(find.text('Done'), findsNothing);
-    await t.tap(find.text('Skip'));
+    expect(find.text('DONE'), findsNothing);
+    await t.tap(find.text('SKIP'));
     await t.pumpAndSettle();
-    expect(find.text('Wait for dash'), findsNothing);
+    expect(find.text('WAIT FOR DASH!'), findsNothing);
     expect(c.working.dash.any((x) => x), isFalse);
   });
 
@@ -71,12 +71,12 @@ void main() {
     final c = await startGame(t);
     expect(c.rules.maxDash, 2);
 
-    await t.tap(find.widgetWithText(InkWell, 'Karim').last);
+    await t.tap(find.text('Karim').last);
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(InkWell, 'Ali').last);
+    await t.tap(find.text('Ali').last);
     await t.pumpAndSettle();
     // Two is the house maximum, so the third press does nothing.
-    await t.tap(find.widgetWithText(InkWell, 'Sara').last);
+    await t.tap(find.text('Sara').last);
     await t.pumpAndSettle();
 
     expect(c.working.dash, [true, true, false, false]);
@@ -102,6 +102,6 @@ void main() {
 
     expect(c.isColorRound, isTrue);
     expect(c.dashPromptPending, isFalse);
-    expect(find.text('Wait for dash'), findsNothing);
+    expect(find.text('WAIT FOR DASH!'), findsNothing);
   });
 }

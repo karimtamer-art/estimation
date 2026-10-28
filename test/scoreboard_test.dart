@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
+import 'package:estimation/ui/screens/scoreboard.dart';
+import 'package:estimation/ui/tokens.dart';
 
 /// The sheet on the result screen, read the way the paper one is: running
 /// totals on every row, the call with its markers, and the distance from 13.
@@ -47,22 +49,25 @@ void main() {
     await t.pumpAndSettle();
 
     // Running totals, not the round's own points: Karim is 25 then 51.
-    expect(find.text('25'), findsOneWidget);
-    expect(find.text('51'), findsOneWidget);
+    final sheet = find.byType(ScoreSheet);
+    Finder inSheet(String t) =>
+        find.descendant(of: sheet, matching: find.text(t));
+    expect(inSheet('25'), findsOneWidget);
+    // Round 2's row, and the totals underneath it.
+    expect(inSheet('51'), findsNWidgets(2));
     // The round's own points ride beside them.
-    expect(find.text('+26'), findsOneWidget);
+    expect(find.text(signedPoints(26)), findsOneWidget);
     // Made and missed, at a glance.
     expect(find.text('▲'), findsNWidgets(5));
     expect(find.text('▼'), findsNWidgets(3));
-    // The Caller wears the trump, the With a W, the Risk its level.
+    // Each round's trump, the With a W, the Risk its level.
     expect(find.text('♥'), findsOneWidget);
     expect(find.text('♠'), findsOneWidget);
     expect(find.text('W'), findsOneWidget);
     expect(find.text('1R'), findsOneWidget);
-    // How far the calls sat from 13.
-    expect(find.text('+1'), findsOneWidget);
-    // Twice: round 2 sat three over, and Ali's total is +3 in the header.
-    expect(find.text('+3'), findsNWidgets(2));
+    // How far the calls sat from 13: one over, then three over.
+    expect(find.text(signedPoints(1)), findsOneWidget);
+    expect(find.text(signedPoints(3)), findsOneWidget);
   });
 
   testWidgets('a passed round reads as passed', (t) async {

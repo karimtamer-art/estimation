@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
+import 'package:estimation/ui/components.dart';
 import 'package:estimation/widgets.dart';
 
 GameController table({
@@ -135,17 +136,12 @@ void main() {
       await t.pumpAndSettle();
 
       expect(c.lockedTrump, Suit.spades);
-      expect(find.byType(TrumpBanner), findsOneWidget);
-      final banner = find.byType(TrumpBanner);
-      expect(find.descendant(of: banner, matching: find.text('♠')),
+      final plaque = find.byType(Plaque).first;
+      expect(find.descendant(of: plaque, matching: find.text('♠')),
           findsOneWidget);
-      expect(find.descendant(of: banner, matching: find.text('Spades')),
+      expect(find.descendant(of: plaque, matching: find.text('SPADES')),
           findsOneWidget);
-      expect(
-        find.descendant(
-            of: banner, matching: find.text('Color 2 of 5 · fixed for this round')),
-        findsOneWidget,
-      );
+      expect(find.text('COLOR 2 OF 5'), findsOneWidget);
       // It is up before the table has done anything at all, and the table is
       // free to estimate straight away — nothing is settled first here.
       expect(c.bidStep, BidStep.table);
@@ -187,10 +183,11 @@ void main() {
       await t.pumpWidget(EstimationApp(controller: c));
       await t.pumpAndSettle();
 
-      // The suit row is gone by now, so the banner is the only place it reads.
-      final banner = find.byType(TrumpBanner);
-      expect(banner, findsOneWidget);
-      expect(find.descendant(of: banner, matching: find.text('Hearts')),
+      // The suit row is gone by now, so the header's plaque is where it reads.
+      final plaque = find.byType(Plaque).first;
+      expect(find.descendant(of: plaque, matching: find.text('♥')),
+          findsOneWidget);
+      expect(find.descendant(of: plaque, matching: find.text('HEARTS')),
           findsOneWidget);
     });
   });
@@ -234,7 +231,8 @@ void main() {
       expect(c.validationError, isNull);
     });
 
-    testWidgets('the seat is offered Edit alone', (t) async {
+    testWidgets('every seat calls for itself, with no call or dash to press',
+        (t) async {
       t.view.physicalSize = const Size(1600, 720);
       t.view.devicePixelRatio = 2.0;
       addTearDown(t.view.reset);
@@ -243,12 +241,17 @@ void main() {
       await t.pumpWidget(EstimationApp(controller: c));
       await t.pumpAndSettle();
 
-      expect(find.text('Edit'), findsNWidgets(4));
-      expect(find.text('Caller'), findsNothing);
-      expect(find.text('Dash'), findsNothing);
+      // Every seat takes a turn on the pad, from this round's starter.
+      for (final turn in ['1ST', '2ND', '3RD', '4TH']) {
+        expect(find.text(turn), findsOneWidget);
+      }
+      expect(find.text('LOCK IN'), findsNothing);
+      expect(find.text('CALL'), findsNothing);
+      expect(find.text('DASH'), findsNothing);
+      expect(find.text('EDIT DASH'), findsNothing);
     });
 
-    testWidgets('a super call drops the suits into the panel as it is typed',
+    testWidgets('a super call asks for the trump as it is locked in',
         (t) async {
       t.view.physicalSize = const Size(1600, 720);
       t.view.devicePixelRatio = 2.0;
@@ -260,34 +263,28 @@ void main() {
       await t.pumpAndSettle();
       expect(c.lockedTrump, Suit.sun);
 
-      await t.tap(find.text('Edit').first);
+      final first = c.callingOrder.first;
+
+      // Seven is not a super call: it lands under the round's own trump.
+      await t.tap(find.byKey(const ValueKey('pad7')));
       await t.pumpAndSettle();
-      final panel = find.byType(CallPanel);
-      expect(panel, findsOneWidget);
+      expect(find.text('SUPER CALL — PICK THE TRUMP'), findsNothing);
+      expect(c.working.bids[first], 7);
+      expect(c.lockedTrump, Suit.sun);
 
-      Finder inPanel(String text) =>
-          find.descendant(of: panel, matching: find.text(text));
-
-      // Nothing under the numbers yet: the trump is the round's.
-      expect(inPanel('♥'), findsNothing);
-
-      await t.tap(inPanel('7'));
+      // Eight is, so the same seat changing to it is asked which suit takes
+      // the round.
+      await t.tap(find.text(c.players[first]));
       await t.pumpAndSettle();
-      expect(inPanel('♥'), findsNothing, reason: 'seven is not a super call');
-
-      // Eight is, so the suits come out under the pad.
-      await t.tap(inPanel('8'));
+      await t.tap(find.byKey(const ValueKey('pad8')));
       await t.pumpAndSettle();
-      expect(inPanel('♥'), findsOneWidget);
-
-      await t.tap(inPanel('♥'));
-      await t.pumpAndSettle();
-      await t.tap(find.text('CONFIRM'));
+      expect(find.text('SUPER CALL — PICK THE TRUMP'), findsOneWidget);
+      await t.tap(find.text('♥'));
       await t.pumpAndSettle();
 
       // The number and the trump land together, and the round is no longer
       // holding a colour of its own.
-      expect(c.working.bids[0], 8);
+      expect(c.working.bids[first], 8);
       expect(c.working.trump, Suit.hearts);
       expect(c.superCalled, isTrue);
       expect(c.lockedTrump, isNull);

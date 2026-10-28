@@ -56,6 +56,11 @@ class Rules {
   bool sameHighestCallStacks; // multiply what is already running, or floor it
   List<Suit> sameHighestCallSuits; // which trumps it is played under
 
+  // In a normal round nobody may call more than the bid winner did: the bid
+  // settled who is highest. Off, the table is an auction again — a seat may
+  // come over the top, and the call moves to it.
+  bool callsCapAtBid;
+
   // HOUSE rule — not in the published ruleset
   bool houseAllEqualDouble; // everyone estimated the same -> x2 + re-estimate
 
@@ -85,6 +90,7 @@ class Rules {
     required this.sameHighestCallColorOnly,
     required this.sameHighestCallStacks,
     required this.sameHighestCallSuits,
+    required this.callsCapAtBid,
     required this.houseAllEqualDouble,
   });
 
@@ -119,7 +125,10 @@ class Rules {
         // doubled value instead.
         sameHighestCallStacks: true,
         sameHighestCallSuits: const [...kColorOrder],
-        houseAllEqualDouble: true,
+        callsCapAtBid: true,
+        // Off unless a table asks for it: it stops the hand with no warning
+        // and keeps doubling for as long as the calls keep matching.
+        houseAllEqualDouble: false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -148,7 +157,10 @@ class Rules {
         'sameHighestCallColorOnly': sameHighestCallColorOnly,
         'sameHighestCallStacks': sameHighestCallStacks,
         'sameHighestCallSuits': [for (final su in sameHighestCallSuits) su.name],
-        'houseAllEqualDouble': houseAllEqualDouble,
+        'callsCapAtBid': callsCapAtBid,
+        // Stored under a new key: the old one was saved as on by default,
+        // and those tables never chose it. Only a fresh choice carries over.
+        'houseAllEqualDoubleOptIn': houseAllEqualDouble,
       };
 
   factory Rules.fromJson(Map<String, dynamic> j) {
@@ -194,7 +206,9 @@ class Rules {
           b('sameHighestCallStacks', d.sameHighestCallStacks),
       sameHighestCallSuits: suits('sameHighestCallSuits',
           d.sameHighestCallSuits),
-      houseAllEqualDouble: b('houseAllEqualDouble', d.houseAllEqualDouble),
+      callsCapAtBid: b('callsCapAtBid', d.callsCapAtBid),
+      houseAllEqualDouble:
+          b('houseAllEqualDoubleOptIn', d.houseAllEqualDouble),
     );
   }
 }

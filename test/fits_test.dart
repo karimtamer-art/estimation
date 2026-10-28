@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
-import 'package:estimation/widgets.dart';
+import 'package:estimation/ui/components.dart';
 
 /// Landscape phones this actually runs on, in physical pixels at 2x — the app
 /// is landscape-only, so the short side is the one that bites.
@@ -80,13 +80,17 @@ void main() {
       await show(t, posed(screen: Screen.bid), size);
       expect(t.takeException(), isNull);
 
-      // The three things a seat can say all read, and on a real phone they
-      // read at full size. Anything over 1.25 would be crushed past legible.
-      final limit = _realPhones.contains(phone) ? 1.0 : 1.25;
-      for (final label in ['Caller', 'Edit', 'Dash']) {
-        expect(find.text(label), findsNWidgets(4));
-        expect(squeeze(t, label), lessThanOrEqualTo(limit),
-            reason: '"$label" does not fit its button on $phone');
+      // Seat 0 holds the call from the bid, seat 1 has called, and seat 2
+      // is up on the pad.
+      expect(find.text('BID'), findsOneWidget);
+      expect(find.text('CALLING…'), findsOneWidget);
+      // Every number on the shared pad is there, and big enough to hit on a
+      // real phone.
+      final floor = _realPhones.contains(phone) ? 40.0 : 30.0;
+      for (var v = 0; v <= 13; v++) {
+        final key = t.getRect(find.byKey(ValueKey('pad$v')));
+        expect(key.width, greaterThanOrEqualTo(floor),
+            reason: 'pad $v is too narrow on $phone');
       }
     });
 
@@ -102,9 +106,10 @@ void main() {
         size,
       );
       expect(t.takeException(), isNull);
-      // Edit stands alone here and has the whole column.
-      expect(find.text('Edit'), findsNWidgets(4));
-      expect(squeeze(t, 'Edit'), lessThanOrEqualTo(1.0));
+      // Nobody holds a call from the bid here: every seat takes its turn.
+      expect(find.text('BID'), findsNothing);
+      expect(find.text('1ST'), findsOneWidget);
+      expect(find.text('4TH'), findsOneWidget);
     });
 
     testWidgets('$phone: Arabic fits too', (t) async {
@@ -118,18 +123,14 @@ void main() {
       (t) async {
     await show(t, posed(screen: Screen.bid), const Size(1784, 824));
 
-    // 412 logical points tall. The seat cards should reach most of the way
-    // down it, not stop two thirds of the way and leave a dead band.
-    final card = t.getSize(find.byType(SeatColumn).first);
-    expect(card.height, greaterThan(220),
+    // 412 logical points tall. The pad sits just above the bar and the
+    // seats fill the height over it, with no dead band anywhere.
+    final pad = t.getRect(find.byKey(const ValueKey('pad0')));
+    final bar = t.getRect(find.byType(BottomBar));
+    expect(bar.top - pad.bottom, lessThan(30),
+        reason: 'the pad is not sitting on the bar');
+    final seat = t.getRect(find.text('Karim'));
+    expect(pad.top - seat.bottom, greaterThan(40),
         reason: 'the seats are not taking the height they are given');
-
-    // And the panel's actions are pushed to the foot of it, so the last one
-    // finishes level with the stat row under the seats instead of stacking
-    // under the step strip and leaving the bottom of the screen bare.
-    final lastAction = t.getRect(find.text('All passed'));
-    final stats = t.getRect(find.byType(StatBar));
-    expect((lastAction.bottom - stats.bottom).abs(), lessThan(30),
-        reason: 'the actions are not sitting at the foot of the panel');
   });
 }

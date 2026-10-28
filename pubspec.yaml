@@ -9,7 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.3.0
+  google_fonts: ^8.2.1
   shared_preferences: ^2.2.2
+  wakelock_plus: ^1.8.2
 
 dev_dependencies:
   flutter_test:
@@ -25,3 +28,6 @@ flutter:
     # purpose — they are the trophy and the punishment.
     - assets/crown.png
     - assets/koz.png
+    - assets/clown.png
+    # The nine faces a seat can wear, ids 0-8 in file order.
+    - assets/avatars/

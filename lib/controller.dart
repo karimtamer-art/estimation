@@ -23,6 +23,20 @@ class GameController extends ChangeNotifier {
   Rules rules = Rules.defaults();
   bool arabic = false;
 
+  /// Which table cloth the screens are drawn on, as an index into the felts
+  /// Settings offers. Looks only — the game never reads it.
+  int felt = 0;
+
+  /// A light tap under the finger on every button press.
+  bool vibrate = true;
+
+  /// Hold the screen awake for the length of a game.
+  bool keepAwake = true;
+
+  /// Whether the tip pointing at the round tile (it pulls the scoresheet
+  /// down) has been seen. It shows through the first game only.
+  bool seenScoreHint = false;
+
   Screen screen = Screen.home;
   Screen _previous = Screen.home;
 
@@ -33,6 +47,10 @@ class GameController extends ChangeNotifier {
   /// game starts on blank seats without touching the names of the game still
   /// sitting there to be resumed.
   List<String> draftPlayers = ['', '', '', ''];
+
+  /// Which animal face each seat wears, by index into the avatar set. Picked
+  /// on the players screen; looks only, the game never reads it.
+  List<int> avatars = [0, 1, 2, 3];
 
   List<Round> rounds = [];
 
@@ -140,8 +158,12 @@ class GameController extends ChangeNotifier {
     return false;
   }
 
+  /// The house rule, in the Color rounds only: a normal round's caller
+  /// bids 4 or more, so it never stops one of those.
   bool get allEqualEstimates {
-    if (!rules.houseAllEqualDouble || !bidsComplete) return false;
+    if (!rules.houseAllEqualDouble || !isColorRound || !bidsComplete) {
+      return false;
+    }
     final live = <int>[];
     for (var i = 0; i < working.bids.length; i++) {
       if (working.dash[i]) return false; // a dash breaks the pattern
@@ -201,7 +223,9 @@ class GameController extends ChangeNotifier {
       if (allEqualEstimates) return s.errAllEqual;
       final d = derived;
       if (d.total == rules.tricks) return s.errTotal13;
-      if (d.top != null && d.top! < rules.minCallerBid) {
+      // A Color round is not bid for, so it has no caller minimum to meet:
+      // its trump comes with the round, and the top call may be anything.
+      if (!isColorRound && d.top != null && d.top! < rules.minCallerBid) {
         return '${s.errMinCaller} ${rules.minCallerBid}.';
       }
       // A round does not start until the table has said who called it and
@@ -344,6 +368,42 @@ class GameController extends ChangeNotifier {
     _save();
   }
 
+  /// Gives [seat] a face. No two players share one: a face another seat
+  /// wears is traded, and that seat takes this one's old face.
+  void setAvatar(int seat, int avatar) {
+    final owner = avatarOwner(avatar, except: seat);
+    if (owner != null) avatars[owner] = avatars[seat];
+    avatars[seat] = avatar;
+    notifyListeners();
+    _save();
+  }
+
+  /// The seat wearing [avatar], other than [except]; null when it is free.
+  int? avatarOwner(int avatar, {int? except}) {
+    for (var i = 0; i < avatars.length; i++) {
+      if (i != except && avatars[i] == avatar) return i;
+    }
+    return null;
+  }
+
+  /// Whether every seat wears a face of its own.
+  bool get avatarsUnique => avatars.toSet().length == avatars.length;
+
+  /// Hands a seat that shares a face the first one nobody wears. Earlier
+  /// versions let two seats pick the same face, and saved it.
+  void _uniqueAvatars() {
+    final seen = <int>{};
+    for (var i = 0; i < avatars.length; i++) {
+      if (seen.add(avatars[i])) continue;
+      var free = 0;
+      while (avatars.contains(free)) {
+        free++;
+      }
+      avatars[i] = free;
+      seen.add(free);
+    }
+  }
+
   void setPlayer(int i, String name) {
     draftPlayers[i] = name;
     _save();
@@ -352,6 +412,31 @@ class GameController extends ChangeNotifier {
   void toggleLanguage() {
     arabic = !arabic;
     _recompute();
+    notifyListeners();
+    _save();
+  }
+
+  void setVibrate(bool on) {
+    vibrate = on;
+    notifyListeners();
+    _save();
+  }
+
+  void setKeepAwake(bool on) {
+    keepAwake = on;
+    notifyListeners();
+    _save();
+  }
+
+  void markScoreHintSeen() {
+    if (seenScoreHint) return;
+    seenScoreHint = true;
+    notifyListeners();
+    _save();
+  }
+
+  void setFelt(int i) {
+    felt = i;
     notifyListeners();
     _save();
   }
@@ -388,9 +473,11 @@ class GameController extends ChangeNotifier {
   /// the offer to resume it. Walking into setup and thinking better of it
   /// never gets this far, so a game can still be backed out of and resumed.
   void startGame() {
+    // A table never sits down with two seats wearing the same face.
+    if (!avatarsUnique) return;
     for (var i = 0; i < players.length; i++) {
       final name = i < draftPlayers.length ? draftPlayers[i].trim() : '';
-      players[i] = name.isEmpty ? 'P${i + 1}' : name;
+      players[i] = name.isEmpty ? '${s.player} ${i + 1}' : name;
     }
     rounds = [];
     pendingMult = 1;
@@ -405,6 +492,25 @@ class GameController extends ChangeNotifier {
   /// The seat took exactly what it called — the ordinary end to a hand, and
   /// the one number nobody should have to hunt for on the pad. A dashed seat
   /// called nothing, so making it means taking none.
+  /// The order tricks are entered in: the caller first, then round the
+  /// table the way the calls go. Every seat counts, a dashed one included.
+  List<int> get trickOrder {
+    var seat = working.caller ?? 0;
+    final out = <int>[];
+    for (var k = 0; k < playerCount; k++) {
+      out.add(seat);
+      seat = seatAfter(seat);
+    }
+    return out;
+  }
+
+  /// Takes a seat's trick count back off the table, to be entered again.
+  void clearTrick(int player) {
+    working.tricks[player] = null;
+    notifyListeners();
+    _save();
+  }
+
   void madeBid(int player) {
     working.tricks[player] = working.bids[player] ?? 0;
     notifyListeners();
@@ -443,9 +549,21 @@ class GameController extends ChangeNotifier {
       return true;
     }
 
-    // The table is an auction: a seat may come over the top of the call, and
-    // the call goes with the number. Only the seat TAKING the call has to be
-    // above everyone, since that press is a claim to be the highest.
+    // In a normal round the bid settled who is highest: nobody calls over the
+    // bid winner. With the rule off the table is an auction instead, and a
+    // seat may come over the top and take the call with the number.
+    final caller = working.caller;
+    if (!asCaller &&
+        rules.callsCapAtBid &&
+        !isColorRound &&
+        caller != null &&
+        caller != player &&
+        !working.dash[caller]) {
+      final top = working.bids[caller];
+      if (top != null && value > top) return false;
+    }
+    // Only the seat TAKING the call has to be above everyone, since that
+    // press is a claim to be the highest.
     if (asCaller) {
       if (value < rules.minCallerBid) return false;
       for (var i = 0; i < playerCount; i++) {
@@ -458,6 +576,36 @@ class GameController extends ChangeNotifier {
     // this seat is the last one left to settle.
     if (pending == 0 && settled + value == rules.tricks) return false;
     return true;
+  }
+
+  /// The seat that calls after [seat]: the one to its right. Every calling
+  /// order is walked with this, so flipping the direction of play is a
+  /// change to this line alone.
+  int seatAfter(int seat) => (seat + 1) % playerCount;
+
+  /// Who calls first in a Color round. It moves one seat each round, the
+  /// way the deal goes round: round 1 starts at seat 1, round 2 at seat 2.
+  int get colorStarter => _roundIndex % playerCount;
+
+  /// The seats still to give a number, in the order they call. A normal
+  /// round starts at the seat after the bid winner, whose own number came
+  /// with the bid; a Color round starts at [colorStarter] and takes every
+  /// seat. Dashed seats sit out at 0.
+  List<int> get callingOrder {
+    final caller = working.caller;
+    final start = isColorRound
+        ? colorStarter
+        : caller == null
+            ? 0
+            : seatAfter(caller);
+    final out = <int>[];
+    var seat = start;
+    for (var k = 0; k < playerCount; k++) {
+      final bidWinner = !isColorRound && seat == caller;
+      if (!bidWinner && !working.dash[seat]) out.add(seat);
+      seat = seatAfter(seat);
+    }
+    return out;
   }
 
   /// The call belongs to the highest estimate on the table. It is pressed to
@@ -710,6 +858,13 @@ class GameController extends ChangeNotifier {
         final j = jsonDecode(raw) as Map<String, dynamic>;
         rules = Rules.fromJson(j['rules'] as Map<String, dynamic>? ?? {});
         arabic = j['arabic'] as bool? ?? false;
+        felt = (j['felt'] as num?)?.toInt() ?? 0;
+        vibrate = j['vibrate'] as bool? ?? true;
+        keepAwake = j['keepAwake'] as bool? ?? true;
+        seenScoreHint = j['seenScoreHint'] as bool? ?? false;
+        final av = (j['avatars'] as List?)?.map((e) => (e as num).toInt());
+        if (av != null && av.length == avatars.length) avatars = av.toList();
+        _uniqueAvatars();
         mode = GameMode.values[(j['mode'] as num?)?.toInt() ?? GameMode.full.index];
         players = (j['players'] as List?)?.map((e) => e as String).toList() ??
             ['', '', '', ''];
@@ -757,6 +912,11 @@ class GameController extends ChangeNotifier {
         jsonEncode({
           'rules': rules.toJson(),
           'arabic': arabic,
+          'felt': felt,
+          'vibrate': vibrate,
+          'keepAwake': keepAwake,
+          'seenScoreHint': seenScoreHint,
+          'avatars': avatars,
           'mode': mode.index,
           'players': players,
           'draft': draftPlayers,

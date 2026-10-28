@@ -6,7 +6,7 @@ import 'package:estimation/controller.dart';
 import 'package:estimation/main.dart';
 import 'package:estimation/models.dart';
 import 'package:estimation/scoring.dart';
-import 'package:estimation/screens.dart';
+import 'package:estimation/ui/screens/scoreboard.dart';
 
 /// Plays [mode] all the way out, the way the table does it: score a round,
 /// press Continue, score the next. Leaves the controller on whatever screen
@@ -87,7 +87,8 @@ void main() {
       await t.pumpAndSettle();
 
       expect(t.takeException(), isNull);
-      expect(find.byType(DoneScreen), findsOneWidget);
+      expect(find.byType(ScoreboardView), findsOneWidget);
+      expect(find.text('GAME OVER'), findsOneWidget);
     });
   }
 

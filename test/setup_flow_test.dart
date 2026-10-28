@@ -30,7 +30,7 @@ void main() {
   test('a seat left blank is named for its number', () {
     final c = GameController()..draftPlayers = ['Karim', '', '  ', 'Omar'];
     c.startGame();
-    expect(c.players, ['Karim', 'P2', 'P3', 'Omar']);
+    expect(c.players, ['Karim', 'Player 2', 'Player 3', 'Omar']);
   });
 
   test('a new game starts on an empty sheet, with no multiplier carried', () {

@@ -40,12 +40,21 @@ void main() {
     test('the table may come over the top of a call already down', () {
       // The auction is not closed by the press: every number stays open, and
       // the call moves to whoever ends up holding the highest.
-      final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0);
+      final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0)
+        ..rules.callsCapAtBid = false;
       expect(offered(c, 1), [for (var n = 0; n <= 13; n++) n]);
     });
 
-    test('matching the call is With, beating it takes the call', () {
+    test('with the cap on (the default), nobody calls over the bid winner',
+        () {
       final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0);
+      expect(c.rules.callsCapAtBid, isTrue);
+      expect(offered(c, 1), [for (var n = 0; n <= 7; n++) n]);
+    });
+
+    test('matching the call is With, beating it takes the call', () {
+      final c = posed(screen: Screen.bid, bids: [7, null, null, null], caller: 0)
+        ..rules.callsCapAtBid = false;
       expect(c.canPick(1, 7), isTrue);
       expect(c.canPick(1, 8), isTrue);
     });

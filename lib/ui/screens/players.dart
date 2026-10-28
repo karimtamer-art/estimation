@@ -179,6 +179,7 @@ class _SeatCard extends StatelessWidget {
             key: ValueKey('name$seat'),
             initial: c.draftPlayers[seat],
             hint: '${s.player} ${seat + 1}',
+            last: seat == c.playerCount - 1,
             onChanged: onName,
           ),
         ],
@@ -369,11 +370,16 @@ class _NameField extends StatelessWidget {
   final String initial;
   final String hint;
   final ValueChanged<String> onChanged;
+
+  /// The last seat's Return closes the keyboard; the others move on to the
+  /// next name.
+  final bool last;
   const _NameField({
     super.key,
     required this.initial,
     required this.hint,
     required this.onChanged,
+    this.last = false,
   });
 
   @override
@@ -385,9 +391,10 @@ class _NameField extends StatelessWidget {
     return SizedBox(
       height: 54,
       child: TextFormField(
-        expands: true,
-        maxLines: null,
         initialValue: initial,
+        textInputAction: last ? TextInputAction.done : TextInputAction.next,
+        // Tapping anywhere else puts the keyboard away.
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
         maxLength: 14,
         textAlign: TextAlign.center,
         textAlignVertical: TextAlignVertical.center,
@@ -400,8 +407,9 @@ class _NameField extends StatelessWidget {
           hintStyle: body(20, weight: FontWeight.w800, color: Palette.muted),
           filled: true,
           fillColor: Palette.inset,
+          isDense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           border: edge,
           enabledBorder: edge,
           focusedBorder: edge.copyWith(

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'controller.dart';
@@ -1318,8 +1320,9 @@ class _Bead extends StatelessWidget {
 // --------------------------------------------------------------------- logo
 
 /// The app mark, drawn rather than shipped as an asset so it stays sharp at
-/// any size and follows the theme. Four cards fanned — four seats — with the
-/// front one gold. Matches design/logo.svg.
+/// any size. Four cards fanned — four seats — on a navy tile, white backs
+/// with a corner suit and the front one gold with a spade. Matches
+/// design/logo.svg.
 class LogoMark extends StatelessWidget {
   final double size;
   const LogoMark({super.key, this.size = 72});
@@ -1337,59 +1340,136 @@ class LogoMark extends StatelessWidget {
 class _FanPainter extends CustomPainter {
   // Geometry in the same 512 box as design/logo.svg, so the two cannot drift.
   static const _rots = [-32.0, -10.5, 11.0, 32.5];
-  static const _cardW = 164.0, _cardH = 232.0, _radius = 22.0, _stroke = 13.0;
+  static const _cardW = 164.0, _cardH = 232.0, _radius = 22.0, _stroke = 12.0;
+  static const _ink = Color(0xFF050505);
+  static const _card = RRect.fromLTRBXY(0, 0, _cardW, _cardH, _radius, _radius);
+  static const _bounds = Rect.fromLTWH(0, 0, _cardW, _cardH);
 
   @override
   void paint(Canvas canvas, Size size) {
     final k = size.width / 512;
     canvas.save();
     canvas.scale(k);
+
+    // The tile: a navy radial gradient, lit from up and to the left.
+    const tile = Rect.fromLTWH(0, 0, 512, 512);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(tile, const Radius.circular(112)),
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.2, -0.36),
+          radius: 0.8,
+          colors: [Color(0xFF2C4F92), Color(0xFF16305F), Color(0xFF0A1633)],
+          stops: [0, 0.55, 1],
+        ).createShader(tile),
+    );
+
     canvas.translate(256, 350);
-
-    final fill = Paint()..color = const Color(0xFF132229);
-    final gold = Paint()..color = AppColors.gold;
-    final edge = Paint()
-      ..color = AppColors.gold
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = _stroke;
-
+    final backs = [
+      (_heart(), const Color(0xFFD9301F)),
+      (_club(), const Color(0xFF1A1A17)),
+      (_diamond(), const Color(0xFFD9301F)),
+    ];
     for (var i = 0; i < _rots.length; i++) {
       final front = i == _rots.length - 1;
       canvas.save();
-      canvas.rotate(_rots[i] * 3.1415926535 / 180);
-      final r = RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-_cardW / 2, -_cardH, _cardW, _cardH),
-        const Radius.circular(_radius),
+      canvas.rotate(_rots[i] * math.pi / 180);
+      canvas.translate(-_cardW / 2, -_cardH);
+
+      // The hard shadow: the same card, 10px down, in the card's own frame.
+      canvas.drawRRect(_card.shift(const Offset(0, 10)),
+          Paint()..color = _ink.withValues(alpha: 0.45));
+      canvas.drawRRect(
+        _card,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: front
+                ? const [Color(0xFFFFE871), Color(0xFFF8C21A), Color(0xFFD99A06)]
+                : const [Color(0xFFFFFFFF), Color(0xFFE4E1D8)],
+            stops: front ? const [0, 0.5, 1] : const [0, 1],
+          ).createShader(_bounds),
       );
-      canvas.drawRRect(r, front ? gold : fill);
-      canvas.drawRRect(r, edge);
-      if (front) _spade(canvas);
+      canvas.drawRRect(
+        _card,
+        Paint()
+          ..color = _ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = _stroke,
+      );
+
+      if (front) {
+        // A sheen across the top third, then the spade.
+        canvas.drawRRect(
+          RRect.fromLTRBXY(12, 12, 152, 86, 14, 14),
+          Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.22),
+        );
+        canvas.save();
+        canvas.translate(82, 116);
+        canvas.scale(1.08);
+        canvas.translate(-50, -54);
+        canvas.drawPath(_spade(), Paint()..color = const Color(0xFF14182A));
+        canvas.restore();
+      } else {
+        // The corner suit, drawn on a 24 grid.
+        final (path, color) = backs[i];
+        canvas.save();
+        canvas.translate(16, 16);
+        canvas.scale(1.55);
+        canvas.drawPath(path, Paint()..color = color);
+        canvas.restore();
+      }
       canvas.restore();
     }
     canvas.restore();
   }
 
-  /// The pip on the gold face, in the card's own frame.
-  void _spade(Canvas canvas) {
-    canvas.save();
-    canvas.translate(0, -116);
-    canvas.scale(1.08);
-    canvas.translate(-50, -54);
-    final p = Path()
-      ..moveTo(50, 12)
-      ..cubicTo(31, 33, 13, 44, 13, 60)
-      ..cubicTo(13, 72, 22, 80, 33, 80)
-      ..cubicTo(40, 80, 46, 76, 49, 70)
-      ..cubicTo(48, 82, 44, 90, 36, 95)
-      ..lineTo(64, 95)
-      ..cubicTo(56, 90, 52, 82, 51, 70)
-      ..cubicTo(54, 76, 60, 80, 67, 80)
-      ..cubicTo(78, 80, 87, 72, 87, 60)
-      ..cubicTo(87, 44, 69, 33, 50, 12)
+  static Path _heart() => Path()
+    ..moveTo(12, 21)
+    ..cubicTo(12, 21, 4.5, 16.4, 2.5, 11.8)
+    ..cubicTo(1, 8.3, 3.2, 5, 6.6, 5)
+    ..cubicTo(8.6, 5, 10.2, 6.1, 11, 7.6)
+    ..lineTo(13, 7.6)
+    ..cubicTo(13.8, 6.1, 15.4, 5, 17.4, 5)
+    ..cubicTo(20.8, 5, 23, 8.3, 21.5, 11.8)
+    ..cubicTo(19.5, 16.4, 12, 21, 12, 21)
+    ..close();
+
+  static Path _club() {
+    const r = Radius.circular(4.2);
+    return Path()
+      ..moveTo(12, 2.8)
+      ..arcToPoint(const Offset(15.6, 9.2), radius: r)
+      ..arcToPoint(const Offset(14, 16.8), radius: r, largeArc: true)
+      ..lineTo(15, 21.5)
+      ..lineTo(9, 21.5)
+      ..lineTo(10, 16.8)
+      ..arcToPoint(const Offset(8.4, 9.2), radius: r, largeArc: true)
+      ..arcToPoint(const Offset(12, 2.8), radius: r)
       ..close();
-    canvas.drawPath(p, Paint()..color = AppColors.bg);
-    canvas.restore();
   }
+
+  static Path _diamond() => Path()
+    ..moveTo(12, 2)
+    ..lineTo(19.5, 12)
+    ..lineTo(12, 22)
+    ..lineTo(4.5, 12)
+    ..close();
+
+  /// The pip on the gold face, on a 100 grid.
+  static Path _spade() => Path()
+    ..moveTo(50, 12)
+    ..cubicTo(31, 33, 13, 44, 13, 60)
+    ..cubicTo(13, 72, 22, 80, 33, 80)
+    ..cubicTo(40, 80, 46, 76, 49, 70)
+    ..cubicTo(48, 82, 44, 90, 36, 95)
+    ..lineTo(64, 95)
+    ..cubicTo(56, 90, 52, 82, 51, 70)
+    ..cubicTo(54, 76, 60, 80, 67, 80)
+    ..cubicTo(78, 80, 87, 72, 87, 60)
+    ..cubicTo(87, 44, 69, 33, 50, 12)
+    ..close();
 
   @override
   bool shouldRepaint(covariant _FanPainter oldDelegate) => false;

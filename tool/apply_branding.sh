@@ -16,6 +16,8 @@ copied=0
 # an icon; the long one is for titles, stores and the browser tab.
 APP_NAME="Estimation Calculator"
 APP_SHORT_NAME="Estimation"
+# The navy behind the icon, for the browser bar and the web app's splash.
+APP_COLOR="#0B1838"
 
 copy() { # from to
   if [ -d "$(dirname "$2")" ]; then
@@ -46,19 +48,23 @@ if [ -d "$root/web" ]; then
         -e 's|content="A new Flutter project."|content="Estimation scorekeeper — Pocket/Egyptian ruleset."|' \
         "$root/web/index.html" > "$root/web/index.html.tmp"
     mv "$root/web/index.html.tmp" "$root/web/index.html"
-    # Browser chrome takes its colour from this; the template has no such tag.
-    if ! grep -q 'name="theme-color"' "$root/web/index.html"; then
-      sed -e 's|content="black">|content="black">\
-  <meta name="theme-color" content="#0F1C22">|' \
+    # Browser chrome takes its colour from this; the template has no such tag,
+    # and an earlier run may have written an older colour into it.
+    if grep -q 'name="theme-color"' "$root/web/index.html"; then
+      sed -e "s|name=\"theme-color\" content=\"[^\"]*\"|name=\"theme-color\" content=\"$APP_COLOR\"|" \
           "$root/web/index.html" > "$root/web/index.html.tmp"
-      mv "$root/web/index.html.tmp" "$root/web/index.html"
+    else
+      sed -e "s|content=\"black\">|content=\"black\">\\
+  <meta name=\"theme-color\" content=\"$APP_COLOR\">|" \
+          "$root/web/index.html" > "$root/web/index.html.tmp"
     fi
+    mv "$root/web/index.html.tmp" "$root/web/index.html"
   fi
   if [ -f "$root/web/manifest.json" ]; then
     sed -e "s|^\([[:space:]]*\)\"name\": \"[^\"]*\"|\1\"name\": \"$APP_NAME\"|" \
         -e "s|\"short_name\": \"[^\"]*\"|\"short_name\": \"$APP_SHORT_NAME\"|" \
-        -e 's|"background_color": "#0175C2"|"background_color": "#0F1C22"|' \
-        -e 's|"theme_color": "#0175C2"|"theme_color": "#0F1C22"|' \
+        -e "s|\"background_color\": \"[^\"]*\"|\"background_color\": \"$APP_COLOR\"|" \
+        -e "s|\"theme_color\": \"[^\"]*\"|\"theme_color\": \"$APP_COLOR\"|" \
         -e 's|"description": "A new Flutter project."|"description": "Estimation scorekeeper — Pocket/Egyptian ruleset."|' \
         -e 's|"orientation": "portrait-primary"|"orientation": "landscape"|' \
         "$root/web/manifest.json" > "$root/web/manifest.json.tmp"
@@ -68,10 +74,17 @@ fi
 
 # --------------------------------------------------------------- android
 if [ -d "$root/android" ]; then
+  res="$root/android/app/src/main/res"
   for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-    copy "$src/android/mipmap-$d/ic_launcher.png" \
-         "$root/android/app/src/main/res/mipmap-$d/ic_launcher.png"
+    for f in ic_launcher ic_launcher_foreground ic_launcher_background; do
+      copy "$src/android/mipmap-$d/$f.png" "$res/mipmap-$d/$f.png"
+    done
   done
+  # Android 8+ builds the icon from those two layers; the template has no
+  # folder for the recipe that says so.
+  mkdir -p "$res/mipmap-anydpi-v26"
+  copy "$src/android/mipmap-anydpi-v26/ic_launcher.xml" \
+       "$res/mipmap-anydpi-v26/ic_launcher.xml"
 
   # flutter create labels the launcher with the raw project name.
   man="$root/android/app/src/main/AndroidManifest.xml"

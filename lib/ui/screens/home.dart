@@ -3,21 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../build_info.dart';
 import '../../controller.dart';
+import '../../widgets.dart' show LogoMark;
 import '../components.dart';
 import '../tokens.dart';
-
-/// Three fanned cards: two white, the front one gold with a spade, and a
-/// heart on the middle one.
-const _logoSvg = '<svg viewBox="0 0 112 96" xmlns="http://www.w3.org/2000/svg">'
-    '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE55C"/><stop offset="1" stop-color="#F2B705"/></linearGradient></defs>'
-    '<g stroke="#050505" stroke-width="3" stroke-linejoin="round">'
-    '<rect x="14" y="16" width="44" height="62" rx="6" fill="#F4F6F5" transform="rotate(-20 36 47)"/>'
-    '<rect x="32" y="10" width="44" height="62" rx="6" fill="#F4F6F5" transform="rotate(-4 54 41)"/>'
-    '<rect x="50" y="12" width="44" height="62" rx="6" fill="url(#g)" transform="rotate(14 72 43)"/>'
-    '</g>'
-    '<path d="M74 30 C80 38 88 42 84 50 C82 54 77 54 75 51 L77 58 L71 58 L73 51 C71 54 66 54 64 50 C60 42 68 38 74 30 Z" fill="#1A1A17" transform="rotate(14 74 44)"/>'
-    '<path d="M43 33 C41 30 36 30 36 35 C36 39 43 43 43 43 C43 43 50 39 50 35 C50 30 45 30 43 33 Z" fill="#E0261B" transform="rotate(-4 43 37)"/>'
-    '</svg>';
 
 /// The same fan, flat white, as a watermark in the far corner.
 const _ghostSvg =
@@ -43,7 +31,8 @@ class HomeView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SvgPicture.string(_logoSvg, width: 112 * k, height: 96 * k),
+          // The app icon itself, drawn: it matches the launcher icons.
+          LogoMark(size: 104 * k),
           SizedBox(height: 10 * k),
           FittedBox(
             fit: BoxFit.scaleDown,

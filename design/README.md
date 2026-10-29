@@ -5,9 +5,21 @@ front one gold and carrying a spade. `logo-maskable.svg` is the same artwork
 full-bleed and pulled into the 80% safe zone Android launchers mask against.
 `logo-favicon.svg` drops the fan for a single card, because the fan's edges turn
 to mush below about 48px.
+`logo-adaptive-foreground.svg` and `logo-adaptive-background.svg` are the two
+layers of the Android 8+ adaptive icon: the fan alone, centred and scaled to
+0.62 so it stays inside the 66dp-of-108dp circle every launcher mask keeps, and
+the navy tile alone.
 
-Palette is the app's own: `#0F1C22` tile, `#D9A441` gold, `#132229` for the
-back cards so their edges read against the tile.
+Style is the app's navy game look:
+- Tile: radial gradient `#2C4F92` → `#16305F` → `#0A1633`, centred at 40% / 32%.
+- Back cards: white faces (`#FFFFFF` → `#E4E1D8`) with a corner suit (♥ `#D9301F`,
+  ♣ `#1A1A17`, ♦ `#D9301F`).
+- Front card: gold gradient `#FFE871` → `#F8C21A` → `#D99A06`, with a white sheen
+  on the top third at 22% and the spade in `#14182A`.
+- Every card has a 12px `#050505` outline and a hard shadow (the same card
+  shape, offset 10px down, `#050505` at 45%).
+
+The card geometry, fan angles and spade path are unchanged from the previous logo.
 
 The Flutter home screen draws the same geometry in `LogoMark`
 (`lib/widgets.dart`) rather than shipping a raster, so it stays sharp at any

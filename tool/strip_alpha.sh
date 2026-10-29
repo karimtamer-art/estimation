@@ -8,7 +8,7 @@ dir=${1:?usage: strip_alpha.sh <dir>}
 
 if command -v magick >/dev/null 2>&1; then
   for f in "$dir"/*.png; do
-    magick "$f" -background '#0F1C22' -alpha remove -alpha off -define png:color-type=2 "$f"
+    magick "$f" -background '#0B1838' -alpha remove -alpha off -define png:color-type=2 "$f"
   done
   echo "strip_alpha: flattened with ImageMagick"
 elif command -v powershell.exe >/dev/null 2>&1; then
@@ -19,7 +19,7 @@ elif command -v powershell.exe >/dev/null 2>&1; then
       \$src = [System.Drawing.Image]::FromFile(\$_.FullName)
       \$flat = New-Object System.Drawing.Bitmap \$src.Width, \$src.Height, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
       \$g = [System.Drawing.Graphics]::FromImage(\$flat)
-      \$g.Clear([System.Drawing.ColorTranslator]::FromHtml('#0F1C22'))
+      \$g.Clear([System.Drawing.ColorTranslator]::FromHtml('#0B1838'))
       \$g.InterpolationMode = 'HighQualityBicubic'
       \$g.DrawImage(\$src, 0, 0, \$src.Width, \$src.Height)
       \$g.Dispose(); \$src.Dispose()

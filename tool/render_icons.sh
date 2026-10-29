@@ -65,7 +65,10 @@ shot() {
   printf '  %s (%s)\n' "${dest#$root/}" "$size"
 }
 
-for f in logo.svg logo-square.svg logo-maskable.svg logo-favicon.svg; do page "$f"; done
+for f in logo.svg logo-square.svg logo-maskable.svg logo-favicon.svg \
+         logo-adaptive-foreground.svg logo-adaptive-background.svg; do
+  page "$f"
+done
 
 # --------------------------------------------------------------------- web
 echo "web:"
@@ -76,13 +79,29 @@ shot logo-maskable.svg 512 "$out/web/Icon-maskable-512.png"
 shot logo-favicon.svg 32 "$out/web/favicon.png"
 # iOS masks the home-screen icon itself, so hand it the square opaque art at
 # Apple's own 180px rather than the rounded tile.
-shot logo-square.svg 180 "$out/web/apple-touch-icon.png" 0F1C22FF
+shot logo-square.svg 180 "$out/web/apple-touch-icon.png" 0B1838FF
 
 # ----------------------------------------------------------------- android
 echo "android:"
 for pair in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
   shot logo.svg "${pair#*:}" "$out/android/mipmap-${pair%:*}/ic_launcher.png"
 done
+# Android 8+ builds the icon itself from two 108dp layers and masks it to the
+# launcher's own shape; the plain ic_launcher above is for older phones.
+for pair in mdpi:108 hdpi:162 xhdpi:216 xxhdpi:324 xxxhdpi:432; do
+  d="$out/android/mipmap-${pair%:*}"
+  shot logo-adaptive-foreground.svg "${pair#*:}" "$d/ic_launcher_foreground.png"
+  shot logo-adaptive-background.svg "${pair#*:}" "$d/ic_launcher_background.png"
+done
+mkdir -p "$out/android/mipmap-anydpi-v26"
+cat > "$out/android/mipmap-anydpi-v26/ic_launcher.xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+XML
+printf '  %s\n' "design/icons/android/mipmap-anydpi-v26/ic_launcher.xml"
 
 # --------------------------------------------------------------------- ios
 # Opaque background, and the alpha channel stripped below: App Store Connect
@@ -92,7 +111,7 @@ ios="20x20@1x:20 20x20@2x:40 20x20@3x:60 29x29@1x:29 29x29@2x:58 29x29@3x:87
      40x40@1x:40 40x40@2x:80 40x40@3x:120 60x60@2x:120 60x60@3x:180
      76x76@1x:76 76x76@2x:152 83.5x83.5@2x:167 1024x1024@1x:1024"
 for pair in $ios; do
-  shot logo-square.svg "${pair#*:}" "$out/ios/Icon-App-${pair%:*}.png" 0F1C22FF
+  shot logo-square.svg "${pair#*:}" "$out/ios/Icon-App-${pair%:*}.png" 0B1838FF
 done
 
 echo "stripping alpha from the ios set..."

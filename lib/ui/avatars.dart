@@ -12,7 +12,7 @@ class Avatar {
   String label(bool arabic) => arabic ? nameAr : name;
 }
 
-/// The nine flat faces, in id order. Each is drawn on an 80×80 board with
+/// The ten flat faces, in id order. Each is drawn on an 80×80 board with
 /// its own square background.
 const List<Avatar> kAvatars = [
   Avatar(0, 'Fox', 'ثعلب', 'assets/avatars/avatar_0_fox.svg'),
@@ -26,6 +26,7 @@ const List<Avatar> kAvatars = [
       'assets/avatars/avatar_6_horus_falcon.svg'),
   Avatar(7, 'Scarab', 'جعران', 'assets/avatars/avatar_7_scarab.svg'),
   Avatar(8, 'Baladi Dog', 'كلب بلدي', 'assets/avatars/avatar_8_baladi_dog.svg'),
+  Avatar(9, 'Towel', 'فوطة', 'assets/avatars/avatar_9_towel.svg'),
 ];
 
 class AvatarFace extends StatelessWidget {

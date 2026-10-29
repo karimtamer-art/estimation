@@ -188,7 +188,7 @@ class _SeatCard extends StatelessWidget {
   }
 }
 
-/// "PICK AN AVATAR · SEAT n": all nine faces, five over four. A face another
+/// "PICK AN AVATAR · SEAT n": all ten faces, five over five. A face another
 /// seat wears is greyed out and cannot be picked; picking a free one saves
 /// it and closes.
 class _AvatarPicker extends StatelessWidget {

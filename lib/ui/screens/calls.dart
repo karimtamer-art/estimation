@@ -465,6 +465,8 @@ class _CallsViewState extends State<CallsView> {
             AvatarTile(
               avatar: c.avatars[i],
               size: face,
+              crown: c.crowned.contains(i),
+              kooz: c.koozed.contains(i),
               frame: isCaller ? AvatarFrame.caller : AvatarFrame.plain,
             ),
             const SizedBox(height: 10),

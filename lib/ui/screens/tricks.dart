@@ -234,6 +234,8 @@ class _TricksViewState extends State<TricksView> {
             AvatarTile(
               avatar: c.avatars[i],
               size: face,
+              crown: c.crowned.contains(i),
+              kooz: c.koozed.contains(i),
               frame: isCaller
                   ? AvatarFrame.caller
                   : made

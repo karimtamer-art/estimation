@@ -227,9 +227,11 @@ void main() {
 
     expect(c.laggardIndex, 3);
     expect(c.leaderIndex, 2);
-    // Who won the bid? carries them beside the names.
-    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
-    expect(find.image(const AssetImage('assets/clown.png')), findsOneWidget);
+    // Who won the bid? puts them on the faces (each hat is drawn twice: once
+    // as its own shadow).
+    expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
+    expect(
+        find.image(const AssetImage('assets/kooz_hat.png')), findsNWidgets(2));
 
     // Open the sheet from the header: it is the scoreboard's own sheet, and
     // the leader's and the last seat's totals are marked on it.
@@ -276,9 +278,29 @@ void main() {
       findsOneWidget,
     );
 
-    // Sara took it and Omar wears it: one crown, one clown, in the standings.
-    expect(find.image(const AssetImage('assets/crown.png')), findsOneWidget);
-    expect(find.image(const AssetImage('assets/clown.png')), findsOneWidget);
+    // Sara took it and Omar wears it: one crown, one kooz hat, in the
+    // standings (each with its shadow).
+    expect(find.image(const AssetImage('assets/crown.png')), findsNWidgets(2));
+    expect(
+        find.image(const AssetImage('assets/kooz_hat.png')), findsNWidgets(2));
+  });
+
+  test('a shared top or bottom crowns, or hats, everyone on it', () {
+    final c = GameController()
+      ..players = ['Karim', 'Ali', 'Sara', 'Omar']
+      ..rounds = [
+        Round(
+          bids: [3, 3, 3, 3],
+          dash: List<bool>.filled(4, false),
+          order: const [],
+          tricks: [3, 3, 3, 4],
+          scores: [30, 30, -10, -10],
+        ),
+      ];
+    expect(c.crowned, {0, 1});
+    expect(c.koozed, {2, 3});
+    // The engine's own outright leader stays unclaimed on a tie.
+    expect(c.leaderIndex, isNull);
   });
   testWidgets('a table level all the way across crowns nobody', (t) async {
     SharedPreferences.setMockInitialValues({});
@@ -303,10 +325,10 @@ void main() {
     await t.pumpAndSettle();
 
     // Everyone shares the top, so it is said as a tie — no crown to hand out
-    // and nobody singled out for the clown.
+    // and nobody singled out for the kooz.
     expect(find.text('Karim & Ali & Sara & Omar tie at 10 points'),
         findsOneWidget);
     expect(find.image(const AssetImage('assets/crown.png')), findsNothing);
-    expect(find.image(const AssetImage('assets/clown.png')), findsNothing);
+    expect(find.image(const AssetImage('assets/kooz_hat.png')), findsNothing);
   });
 }

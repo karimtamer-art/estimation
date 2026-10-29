@@ -28,6 +28,6 @@ flutter:
     # purpose — they are the trophy and the punishment.
     - assets/crown.png
     - assets/koz.png
-    - assets/clown.png
+    - assets/kooz_hat.png
     # The nine faces a seat can wear, ids 0-8 in file order.
     - assets/avatars/

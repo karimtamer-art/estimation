@@ -442,10 +442,8 @@ class _SheetHeader extends StatelessWidget {
   }
 
   Widget _seat(int i, int total) {
-    // Crown and clown go to an outright first and last only, as everywhere
-    // else in the game: a shared place wears nothing.
-    final top = i == c.leaderIndex;
-    final low = i == c.laggardIndex;
+    // The leaders' totals are gold; the crown itself sits on the faces.
+    final top = c.crowned.contains(i);
     final ink = top
         ? Palette.gold
         : total > 0
@@ -486,14 +484,6 @@ class _SheetHeader extends StatelessWidget {
                     style: display(17, spacing: 0.1),
                   ),
                 ),
-                if (top || low) ...[
-                  const SizedBox(width: 6),
-                  Image.asset(
-                    top ? 'assets/crown.png' : 'assets/clown.png',
-                    width: 28,
-                    height: 28,
-                  ),
-                ],
               ],
             ),
           ),

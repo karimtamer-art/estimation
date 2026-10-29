@@ -554,8 +554,8 @@ enum AvatarFrame { plain, caller, made, dash, idle }
 enum BubbleTone { plain, leader, last }
 
 /// A seat's face in a framed rounded square. Optional extras: the running
-/// total on the top-end corner, and the crown or the clown on the top-start
-/// corner for whoever is outright first or last.
+/// total on the top-end corner, and the crown or the kooz hat on its head
+/// for whoever is first or last (see [HeadMark]).
 class AvatarTile extends StatelessWidget {
   final int avatar;
   final double size;
@@ -563,7 +563,7 @@ class AvatarTile extends StatelessWidget {
   final String? total;
   final BubbleTone bubble;
   final bool crown;
-  final bool clown;
+  final bool kooz;
   final VoidCallback? onTap;
   final String? semantics;
 
@@ -575,14 +575,13 @@ class AvatarTile extends StatelessWidget {
     this.total,
     this.bubble = BubbleTone.plain,
     this.crown = false,
-    this.clown = false,
+    this.kooz = false,
     this.onTap,
     this.semantics,
   });
 
   @override
   Widget build(BuildContext context) {
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     final frameColor = switch (frame) {
       AvatarFrame.plain => Palette.plainFrame,
       AvatarFrame.caller => Palette.gold,
@@ -591,7 +590,6 @@ class AvatarTile extends StatelessWidget {
       AvatarFrame.idle => const Color(0x80FFFFFF),
     };
     final radius = (size * 0.16).clamp(12.0, 18.0);
-    final iconSize = size * 0.57;
 
     Widget tile = Container(
       width: size,
@@ -649,23 +647,105 @@ class AvatarTile extends StatelessWidget {
                   style: display(15, color: Palette.onGold)),
             ),
           ),
-        if (crown || clown)
-          PositionedDirectional(
-            top: crown ? -iconSize * 0.6 : -iconSize * 0.56,
-            start: -iconSize * 0.48,
-            child: Transform.rotate(
-              // Tilted outward, so it leans the other way in Arabic.
-              angle: (crown ? -18 : -12) * math.pi / 180 * (rtl ? -1 : 1),
-              child: Image.asset(
-                crown ? 'assets/crown.png' : 'assets/clown.png',
-                width: iconSize,
-                height: iconSize,
-              ),
-            ),
-          ),
+        if (crown || kooz) HeadMark.hat(size: size, crown: crown),
       ],
     );
   }
+}
+
+/// The crown on the leader's head, or the kooz hat on the last seat's: either
+/// sits centred on a face [size] wide, overlapping its top edge by half its
+/// own height and tipped a little. Wrap a face in [HeadMark] or, inside a
+/// face's own stack, place [HeadMark.hat].
+class HeadMark extends StatelessWidget {
+  final Widget child;
+  final double size;
+  final bool crown;
+  final bool kooz;
+  const HeadMark({
+    super.key,
+    required this.child,
+    required this.size,
+    this.crown = false,
+    this.kooz = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!crown && !kooz) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [child, HeadMark.hat(size: size, crown: crown)],
+    );
+  }
+
+  /// Just the hat, positioned for a stack whose top-left is the face's.
+  static Widget hat({required double size, required bool crown}) {
+    // crown.png has a margin round the crown itself (217×181 inside 256²);
+    // the kooz hat fills its picture. Widths are of what you see.
+    final double w, h, top;
+    if (crown) {
+      w = size * 0.85 * 256 / 217;
+      final seen = w * 181 / 256;
+      top = -seen * 0.5 - w * 33 / 256;
+      h = w;
+    } else {
+      w = size * 0.95;
+      h = w * 91 / 172;
+      top = -h * 0.5;
+    }
+    final asset = crown ? 'assets/crown.png' : 'assets/kooz_hat.png';
+    return Positioned(
+      top: top,
+      left: (size - w) / 2,
+      width: w,
+      height: h,
+      child: IgnorePointer(
+        child: Transform.rotate(
+          angle: (crown ? -8 : -7) * math.pi / 180,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // The hard drop shadow: the same shape in black, 3px down.
+              Positioned.fill(
+                top: 3,
+                bottom: -3,
+                child: Image.asset(asset,
+                    color: const Color(0x8C000000),
+                    colorBlendMode: BlendMode.srcIn),
+              ),
+              Positioned.fill(
+                child: Image.asset(asset,
+                    semanticLabel: crown ? 'leader' : 'last place'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The big silver DASH stamp laid over a seat that dashed.
+class DashStamp extends StatelessWidget {
+  final String label;
+  const DashStamp(this.label, {super.key});
+
+  @override
+  Widget build(BuildContext context) => Transform.rotate(
+        angle: -6 * math.pi / 180,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 2),
+          decoration: BoxDecoration(
+            gradient: vgrad(Palette.silverHi, Palette.silverLo),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: Palette.outline, width: 3),
+            boxShadow: hardShadow(5),
+          ),
+          child: Text(label.toUpperCase(),
+              style: display(30, color: Palette.onGold, spacing: 0.04)),
+        ),
+      );
 }
 
 // --------------------------------------------------------------- trick bar

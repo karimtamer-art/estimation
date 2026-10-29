@@ -264,19 +264,31 @@ class GameController extends ChangeNotifier {
   int? get laggardIndex => _extremeIndex(highest: false);
 
   int? _extremeIndex({required bool highest}) {
-    if (playedCount == 0) return null;
+    final holders = _standing(highest: highest);
+    return holders.length == 1 ? holders.first : null;
+  }
+
+  /// Every seat wearing the crown: all those level on the highest total.
+  Set<int> get crowned => _standing(highest: true);
+
+  /// Every seat wearing the kooz hat: all those level on the lowest total.
+  Set<int> get koozed => _standing(highest: false);
+
+  /// The seats on the highest (or lowest) total. Nobody before a round has
+  /// been scored, and nobody while the whole table is level — the crown and
+  /// the kooz would both go to everyone.
+  Set<int> _standing({required bool highest}) {
+    if (playedCount == 0) return const {};
     final t = totals;
+    if (t.every((v) => v == t.first)) return const {};
     var best = t[0];
     for (final v in t) {
       if (highest ? v > best : v < best) best = v;
     }
-    final holders = <int>[];
-    for (var i = 0; i < t.length; i++) {
-      if (t[i] == best) holders.add(i);
-    }
-    // A crown shared by everyone marks nothing useful.
-    if (holders.length != 1) return null;
-    return holders.first;
+    return {
+      for (var i = 0; i < t.length; i++)
+        if (t[i] == best) i,
+    };
   }
 
   void goHome() {

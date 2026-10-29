@@ -88,7 +88,7 @@ Future<void> main() async {
         c.setValue(3, 4);
       }
     }
-        // `scores=1` puts a played round on the sheet, for the crown and clown.
+        // `scores=1` puts a played round on the sheet, for the crown and the kooz.
     if (q['scores'] == '1') {
       c.rounds.add(Round(
         bids: [3, 6, 0, 4],

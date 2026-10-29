@@ -224,19 +224,24 @@ class _Standings extends StatelessWidget {
                     color: Palette.onGold, height: 1)),
           ),
           SizedBox(width: gap),
-          Container(
-            width: face,
-            height: face,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
-              boxShadow: const [
-                BoxShadow(color: Palette.outline, spreadRadius: 1.5),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: AvatarFace(index: c.avatars[seat], size: face - 6),
+          HeadMark(
+            size: face,
+            crown: c.crowned.contains(seat),
+            kooz: c.koozed.contains(seat),
+            child: Container(
+              width: face,
+              height: face,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
+                boxShadow: const [
+                  BoxShadow(color: Palette.outline, spreadRadius: 1.5),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: AvatarFace(index: c.avatars[seat], size: face - 6),
+              ),
             ),
           ),
           SizedBox(width: gap),
@@ -245,26 +250,10 @@ class _Standings extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(c.players[seat],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: body(20, weight: FontWeight.w900, color: fg)),
-                    ),
-                    if (seat == g.leader || seat == g.laggard) ...[
-                      const SizedBox(width: 8),
-                      Image.asset(
-                        seat == g.leader
-                            ? 'assets/crown.png'
-                            : 'assets/clown.png',
-                        width: 36,
-                        height: 36,
-                      ),
-                    ],
-                  ],
-                ),
+                Text(c.players[seat],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: body(20, weight: FontWeight.w900, color: fg)),
                 Opacity(
                   opacity: 0.8,
                   child: Text(s.madeOfCalls(g.won[seat], g.played),
@@ -407,9 +396,9 @@ class ScoreSheet extends StatelessWidget {
                       child: Text(
                         signedPoints(totals[k], plus: false),
                         style: display(24,
-                            color: k == c.leaderIndex
+                            color: c.crowned.contains(k)
                                 ? Palette.gold
-                                : k == c.laggardIndex
+                                : c.koozed.contains(k)
                                     ? Palette.redText
                                     : Palette.text),
                       ),

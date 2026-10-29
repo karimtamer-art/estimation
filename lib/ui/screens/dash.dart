@@ -84,6 +84,8 @@ class DashModal extends StatelessWidget {
                       child: _DashTile(
                         name: c.players[i],
                         avatar: c.avatars[i],
+                        crown: c.crowned.contains(i),
+                        kooz: c.koozed.contains(i),
                         on: dashed[i],
                         label: s.dash,
                         // Only as many dashes as the rules allow. Ones already
@@ -147,12 +149,16 @@ class DashModal extends StatelessWidget {
 class _DashTile extends StatefulWidget {
   final String name;
   final int avatar;
+  final bool crown;
+  final bool kooz;
   final bool on;
   final String label;
   final VoidCallback? onTap;
   const _DashTile({
     required this.name,
     required this.avatar,
+    required this.crown,
+    required this.kooz,
     required this.on,
     required this.label,
     required this.onTap,
@@ -186,19 +192,24 @@ class _DashTileState extends State<_DashTile> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
-              boxShadow: const [
-                BoxShadow(color: Palette.outline, spreadRadius: 1.5),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(11),
-              child: AvatarFace(index: widget.avatar, size: 70),
+          HeadMark(
+            size: 76,
+            crown: widget.crown,
+            kooz: widget.kooz,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
+                boxShadow: const [
+                  BoxShadow(color: Palette.outline, spreadRadius: 1.5),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: AvatarFace(index: widget.avatar, size: 70),
+              ),
             ),
           ),
           const SizedBox(height: 10),

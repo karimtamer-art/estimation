@@ -151,8 +151,8 @@ class _BidViewState extends State<BidView> {
           avatar: c.avatars[i],
           total: totals[i],
           pts: s.pts,
-          crown: c.leaderIndex == i,
-          clown: c.laggardIndex == i,
+          crown: c.crowned.contains(i),
+          kooz: c.koozed.contains(i),
           dashed: c.working.dash[i],
           selected: _seat == i,
           callLabel: s.callBadge,
@@ -314,14 +314,15 @@ class _BidViewState extends State<BidView> {
   }
 }
 
-/// A seat in "who won the bid?": gold when picked, dimmed when it dashed.
+/// A seat in "who won the bid?": gold when picked; outlined in white and
+/// stamped DASH when it dashed, and then it cannot be picked.
 class _SeatPick extends StatelessWidget {
   final String name;
   final int avatar;
   final int total;
   final String pts;
   final bool crown;
-  final bool clown;
+  final bool kooz;
   final bool dashed;
   final bool selected;
   final String callLabel;
@@ -334,7 +335,7 @@ class _SeatPick extends StatelessWidget {
     required this.total,
     required this.pts,
     required this.crown,
-    required this.clown,
+    required this.kooz,
     required this.dashed,
     required this.selected,
     required this.callLabel,
@@ -345,17 +346,24 @@ class _SeatPick extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = selected ? Palette.onGold : Palette.text;
-    final face = Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
-        boxShadow: const [BoxShadow(color: Palette.outline, spreadRadius: 1.5)],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(9),
-        child: AvatarFace(index: avatar, size: 58),
+    final face = HeadMark(
+      size: 64,
+      crown: crown,
+      kooz: kooz,
+      child: Container(
+        width: 64,
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF4F6F5), width: 3),
+          boxShadow: const [
+            BoxShadow(color: Palette.outline, spreadRadius: 1.5)
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(9),
+          child: AvatarFace(index: avatar, size: 58),
+        ),
       ),
     );
     final tile = AnimatedContainer(
@@ -367,7 +375,9 @@ class _SeatPick extends StatelessWidget {
             ? vgrad(Palette.goldHi, Palette.goldLo)
             : vgrad(Palette.darkHi, Palette.darkLo),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Palette.outline, width: 2),
+        border: dashed
+            ? Border.all(color: Colors.white, width: 2.5)
+            : Border.all(color: Palette.outline, width: 2),
         boxShadow: hardShadow(selected ? 2 : 5),
       ),
       child: Row(
@@ -379,24 +389,10 @@ class _SeatPick extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: body(20, weight: FontWeight.w900, color: fg)),
-                    ),
-                    if (crown || clown) ...[
-                      const SizedBox(width: 8),
-                      Image.asset(
-                        crown ? 'assets/crown.png' : 'assets/clown.png',
-                        width: 34,
-                        height: 34,
-                      ),
-                    ],
-                  ],
-                ),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: body(20, weight: FontWeight.w900, color: fg)),
                 const SizedBox(height: 4),
                 Opacity(
                   opacity: 0.8,
@@ -406,35 +402,42 @@ class _SeatPick extends StatelessWidget {
               ],
             ),
           ),
+          if (dashed) ...[
+            const SizedBox(width: 10),
+            // Shrinks on a narrow tile before the name has to.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Padding(
+                  // Room for the tilt and the shadow.
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 9),
+                  child: DashStamp(dashLabel),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
-    final tag = selected
-        ? GameBadge(callLabel, size: 14)
-        : dashed
-            ? GameBadge(dashLabel, tone: BadgeTone.dash, size: 14)
-            : null;
+    final tag = selected ? GameBadge(callLabel, size: 14) : null;
     return Semantics(
       button: true,
       selected: selected,
       enabled: onTap != null,
       child: GestureDetector(
         onTap: onTap,
-        child: Opacity(
-          opacity: dashed ? 0.55 : 1,
-          child: Stack(
-            clipBehavior: Clip.none,
-            fit: StackFit.passthrough,
-            children: [
-              tile,
-              if (tag != null)
-                PositionedDirectional(
-                  top: -12 + (selected ? 3 : 0),
-                  end: 12,
-                  child: tag,
-                ),
-            ],
-          ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          fit: StackFit.passthrough,
+          children: [
+            tile,
+            if (tag != null)
+              PositionedDirectional(
+                top: -12 + (selected ? 3 : 0),
+                end: 12,
+                child: tag,
+              ),
+          ],
         ),
       ),
     );

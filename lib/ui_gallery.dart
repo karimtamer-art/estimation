@@ -188,7 +188,7 @@ class _GalleryState extends State<Gallery> {
                       avatar: 3,
                       total: '−18',
                       bubble: BubbleTone.last,
-                      clown: true,
+                      kooz: true,
                     ),
                     const AvatarTile(
                         avatar: 0, size: 56, frame: AvatarFrame.dash),

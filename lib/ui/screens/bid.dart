@@ -13,9 +13,13 @@ import '../tokens.dart';
 /// Who won the bid, for how many, under which trump. Nothing reaches the
 /// round until CONTINUE TO CALLS, which settles all three in one press —
 /// the same [GameController.applyCall] the old call panel's Confirm made.
+/// Color rounds never open here: their table goes straight to the calls.
 class BidView extends StatefulWidget {
   final GameController c;
   const BidView({super.key, required this.c});
+
+  /// Preview only: open with this seat, bid and trump already picked.
+  static (int, int?, Suit?)? debugPick;
 
   @override
   State<BidView> createState() => _BidViewState();
@@ -25,7 +29,7 @@ class _BidViewState extends State<BidView> {
   GameController get c => widget.c;
 
   int? _seat;
-  late int _bid;
+  int? _bid;
   Suit? _suit;
 
   @override
@@ -34,54 +38,56 @@ class _BidViewState extends State<BidView> {
     // Opens on whatever the round already holds, so coming back is an edit.
     final held = c.working.caller;
     _seat = held != null && !c.working.dash[held] ? held : null;
-    _bid =
-        (_seat == null ? null : c.working.bids[_seat!]) ?? c.rules.minCallerBid;
+    _bid = _seat == null ? null : c.working.bids[_seat!];
     _suit = c.working.trump;
+    final pick = BidView.debugPick;
+    if (pick != null) {
+      _seat = pick.$1;
+      _bid = pick.$2;
+      _suit = pick.$3;
+    }
   }
 
-  /// Every number the engine would take from [_seat] as the Caller.
-  List<int> get _allowed {
+  /// The lowest winning bid: the engine's minimum in a normal round, none in
+  /// a Color round.
+  int get _min => c.isColorRound ? 1 : c.rules.minCallerBid;
+
+  /// Whether the engine would take [n] from the picked seat as the Caller.
+  bool _open(int n) {
+    if (n < _min) return false;
     final seat = _seat;
-    return [
-      for (var n = c.rules.minCallerBid; n <= c.rules.tricks; n++)
-        if (seat == null || c.canPick(seat, n, asCaller: true)) n,
-    ];
+    return seat == null || c.isColorRound || c.canPick(seat, n, asCaller: true);
   }
 
   void _pickSeat(int i) {
     setState(() {
       _seat = _seat == i ? null : i;
-      final ok = _allowed;
-      if (ok.isNotEmpty && !ok.contains(_bid)) _bid = ok.first;
+      if (_bid != null && !_open(_bid!)) _bid = null;
     });
   }
 
-  void _step(int d) {
-    final ok = _allowed;
-    final i = ok.indexOf(_bid);
-    final next = i + d;
-    if (i < 0 || next < 0 || next >= ok.length) return;
-    setState(() => _bid = ok[next]);
-  }
-
-  bool get _ready =>
-      _seat != null &&
-      _allowed.contains(_bid) &&
-      (_suit != null || c.lockedTrump != null);
-
-  void _go() {
-    if (!_ready) return;
-    c.applyCall(_seat!, c.lockedTrump == null ? _suit : null, _bid);
-  }
+  void _go(int bid) =>
+      c.applyCall(_seat!, c.lockedTrump == null ? _suit : null, bid);
 
   @override
   Widget build(BuildContext context) {
     final s = c.s;
-    final ok = _allowed;
-    final i = ok.indexOf(_bid);
-    final summary = _seat == null
-        ? s.pickWhoWon
-        : s.bidsSummary(c.players[_seat!], _bid, _suit?.label(c.arabic));
+    // A bid the round no longer takes (its type changed, or the seat did)
+    // is dropped rather than carried on.
+    if (_bid != null && !_open(_bid!)) _bid = null;
+    final bid = _bid;
+    final trump = c.lockedTrump ?? _suit;
+    final (String summary, bool done) = _seat == null
+        ? (s.pickWhoWon, false)
+        : bid == null
+            ? (s.pickWinningBid, false)
+            : trump == null
+                ? (s.pickTrump, false)
+                : (
+                    s.bidsSummary(
+                        c.players[_seat!], bid, trump.label(c.arabic)),
+                    true
+                  );
 
     return ScreenFrame(
       c: c,
@@ -94,7 +100,7 @@ class _BidViewState extends State<BidView> {
           children: [
             Expanded(child: _whoWon(s)),
             const SizedBox(width: 18),
-            SizedBox(width: side, child: _bidPanel(s, ok, i)),
+            SizedBox(width: side, child: _bidPanel(s)),
           ],
         );
       }),
@@ -105,16 +111,15 @@ class _BidViewState extends State<BidView> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: display(22,
-              spacing: 0.02,
-              color: _seat == null ? Palette.secondary : Palette.gold),
+              spacing: 0.02, color: done ? Palette.gold : Palette.secondary),
         ),
         actions: [
-          // The dash window opens by itself as the round starts; this is the
-          // way back into it.
+          // Back to the dash window, which opens by itself as the round
+          // starts.
           GameButton(
-            label: s.editDash,
+            label: s.back,
             tone: ButtonTone.dark,
-            width: 150,
+            width: 110,
             fontSize: 17,
             onTap: () => DashModal.show(context, c),
           ),
@@ -129,7 +134,7 @@ class _BidViewState extends State<BidView> {
             label: s.continueToCalls,
             width: 240,
             fontSize: 19,
-            onTap: _ready ? _go : null,
+            onTap: done ? () => _go(bid!) : null,
           ),
         ],
       ),
@@ -176,7 +181,20 @@ class _BidViewState extends State<BidView> {
     );
   }
 
-  Widget _bidPanel(Str s, List<int> ok, int i) {
+  Widget _bidPanel(Str s) {
+    final color = c.isColorRound;
+    Widget numbers(int from, int to) => Row(
+          children: [
+            for (var n = from; n <= from + 6; n++) ...[
+              if (n > from) const SizedBox(width: 8),
+              Expanded(
+                child: n > to
+                    ? const SizedBox.shrink()
+                    : KeyedSubtree(key: ValueKey('bid$n'), child: _number(n)),
+              ),
+            ],
+          ],
+        );
     final panel = Container(
       width: 520,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -189,77 +207,52 @@ class _BidViewState extends State<BidView> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading(s.winningBid),
-          const SizedBox(height: 8),
           Row(
             children: [
-              GameButton(
-                label: '−',
-                tone: ButtonTone.dark,
-                width: 62,
-                height: 62,
-                radius: 14,
-                fontSize: 30,
-                onTap: i > 0 ? () => _step(-1) : null,
-              ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Container(
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Palette.inset,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Palette.outline, width: 2),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Color(0x8C000000),
-                          offset: Offset(0, 4),
-                          blurRadius: 8,
-                          spreadRadius: -4),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text('$_bid',
-                          style: display(56, height: 1).copyWith(shadows: [
-                            const Shadow(
-                                offset: Offset(0, 3), color: Palette.outline),
-                          ])),
-                      const SizedBox(width: 10),
-                      Text(s.tricksWord.toUpperCase(),
-                          style: display(18, color: Palette.muted)),
-                    ],
-                  ),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: FittedBox(
+                      fit: BoxFit.scaleDown, child: _heading(s.winningBid)),
                 ),
               ),
-              const SizedBox(width: 12),
-              GameButton(
-                label: '+',
-                tone: ButtonTone.dark,
-                width: 62,
-                height: 62,
-                radius: 14,
-                fontSize: 30,
-                onTap: i >= 0 && i < ok.length - 1 ? () => _step(1) : null,
+              const SizedBox(width: 10),
+              GameBadge(
+                color
+                    ? s.colorAnyNumber
+                    : s.normalRoundMin(c.rules.minCallerBid),
+                tone: color ? BadgeTone.call : BadgeTone.dash,
+                size: 12,
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          // A keypad: 1 sits on the left in Arabic too.
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              children: [
+                numbers(1, 7),
+                const SizedBox(height: 10),
+                numbers(8, c.rules.tricks),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           _heading(s.trump),
           const SizedBox(height: 8),
           Row(
             children: [
               for (final su in kColorOrder) ...[
-                if (su != kColorOrder.first) const SizedBox(width: 10),
+                if (su != kColorOrder.first) const SizedBox(width: 8),
                 Expanded(
                   child: _SuitPick(
                     suit: su,
                     label: su.label(c.arabic),
-                    selected: _suit == su,
-                    onTap: () => setState(() => _suit = su),
+                    selected: (c.lockedTrump ?? _suit) == su,
+                    onTap: c.lockedTrump != null && c.lockedTrump != su
+                        ? null
+                        : () => setState(() => _suit = su),
                   ),
                 ),
               ],
@@ -267,8 +260,10 @@ class _BidViewState extends State<BidView> {
           ),
           const SizedBox(height: 14),
           Text(
-            '${s.trumpOrder} '
-            '${kColorOrder.map((x) => x.symbol).join('  ')}',
+            s.trumpOrder(
+              Suit.sun.label(c.arabic),
+              kColorOrder.skip(1).map((x) => x.symbol).join(' '),
+            ),
             style: body(14, color: Palette.secondary).copyWith(
                 fontFamilyFallback: const ['Segoe UI Symbol', 'Cairo']),
           ),
@@ -279,6 +274,42 @@ class _BidViewState extends State<BidView> {
     return Align(
       alignment: AlignmentDirectional.topCenter,
       child: FittedBox(fit: BoxFit.scaleDown, child: panel),
+    );
+  }
+
+  /// One bid number: chunky and pressable, gold when it is the bid; dashed
+  /// and struck out when the round will not take it.
+  Widget _number(int n) {
+    if (!_open(n)) {
+      return Semantics(
+        button: true,
+        enabled: false,
+        label: '$n',
+        child: CustomPaint(
+          foregroundPainter: const DashedEdge(
+              radius: 12, color: Color(0x40FFFFFF), strike: true),
+          child: Container(
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0x26000000),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text('$n',
+                style: display(24, color: const Color(0x66B5BFD6), height: 1)),
+          ),
+        ),
+      );
+    }
+    final on = _bid == n;
+    return GameButton(
+      label: '$n',
+      tone: on ? ButtonTone.gold : ButtonTone.dark,
+      selected: on,
+      height: 56,
+      fontSize: 24,
+      inset: 2,
+      onTap: () => setState(() => _bid = n),
     );
   }
 }
@@ -410,12 +441,13 @@ class _SeatPick extends StatelessWidget {
   }
 }
 
-/// A trump on a white card; gold and sunk when it is the one picked.
+/// A trump on a silver button, in its own ink; gold and sunk when it is the
+/// one picked. Sun has no suit, so it shows a sun.
 class _SuitPick extends StatelessWidget {
   final Suit suit;
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _SuitPick({
     required this.suit,
     required this.label,
@@ -425,47 +457,26 @@ class _SuitPick extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
+    return GameButton(
+      tone: selected ? ButtonTone.gold : ButtonTone.silver,
       selected: selected,
-      label: label,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 80),
-          height: 84,
-          transform: Matrix4.translationValues(0, selected ? 3 : 0, 0),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? vgrad(Palette.goldHi, Palette.goldLo)
-                : vgrad(Colors.white, const Color(0xFFD9DDE0)),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Palette.outline, width: 2),
-            boxShadow: [
-              BoxShadow(
-                  offset: Offset(0, selected ? 1 : 4), color: Palette.outline),
-              if (selected)
-                const BoxShadow(color: Color(0x66FFD23F), spreadRadius: 4),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SuitGlyph(suit,
+      height: 84,
+      radius: 14,
+      inset: 4,
+      semantics: label,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          suit == Suit.sun
+              ? Icon(Icons.wb_sunny_rounded,
                   size: 34,
-                  color: selected && suit == Suit.sun ? Palette.onGold : null),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(label.toUpperCase(),
-                      style: display(12, color: Palette.onGold, spacing: 0.06)),
-                ),
-              ),
-            ],
-          ),
-        ),
+                  color: selected ? Palette.onGold : suitInk(Suit.sun))
+              : SuitGlyph(suit, size: 34),
+          const SizedBox(height: 4),
+          Text(label.toUpperCase(),
+              style: display(12, color: Palette.onGold, spacing: 0.06)),
+        ],
       ),
     );
   }

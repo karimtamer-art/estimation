@@ -90,14 +90,21 @@ class Str {
   String get callBadge => _p('Call', 'كول');
   String get whoWonBid => _p('Who won the bid?', 'مين كسب المزايدة؟');
   String get winningBid => _p('Winning bid', 'المزايدة الكسبانة');
-  String get tricksWord => _p('Tricks', 'لمّة');
-  String get trumpOrder => _p('The caller picks trump. Strongest first:',
-      'الكولر بيختار الحكم. الأقوى الأول:');
+  /// "The caller picks trump. Strongest first: Sun, then ♠ ♥ ♦ ♣."
+  String trumpOrder(String sun, String suits) => _p(
+      'The caller picks trump. Strongest first: $sun, then $suits.',
+      'الكولر بيختار الحكم. الأقوى الأول: $sun، وبعدين $suits.');
   String get pickWhoWon => _p('Pick who won the bid', 'اختار مين كسب المزايدة');
+  String get pickWinningBid =>
+      _p('Pick the winning bid', 'اختار المزايدة الكسبانة');
+  String get pickTrump => _p('Pick the trump', 'اختار الحكم');
+  String normalRoundMin(int n) =>
+      _p('Normal round · min $n', 'جولة عادية · أقل حاجة $n');
+  String get colorAnyNumber =>
+      _p('Color round · any number', 'جولة ألوان · أي رقم');
   String bidsSummary(String name, int bid, String? suit) => _p(
       '$name bids $bid${suit == null ? '' : ' · $suit'}',
       '$name طلب $bid${suit == null ? '' : ' · $suit'}');
-  String get pickTrumpToo => _p('now pick the trump', 'اختار الحكم');
   String get continueToCalls => _p('Continue to calls', 'كمّل للتقديرات');
   // Calls
   String get calledOf => _p('/ 13 called', '/ 13 متقدّر');

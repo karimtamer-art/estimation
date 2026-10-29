@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'controller.dart';
 import 'main.dart';
 import 'models.dart';
+import 'theme.dart';
 import 'ui/pulldown.dart';
+import 'ui/screens/bid.dart';
 import 'ui/screens/players.dart';
 
 /// Dev entry for checking one screen at a time without clicking through the
@@ -38,6 +40,30 @@ Future<void> main() async {
       if (i != null) c.toggleDash(i);
     }
     if (q['modal'] == '0') c.dashPromptPending = false;
+    // `pick=1,6,hearts` opens the bid screen with Omar's 6 in hearts picked;
+    // leave off the trump or the bid for the earlier steps.
+    final pick = (q['pick'] ?? '').split(',');
+    if (pick.first.isNotEmpty) {
+      BidView.debugPick = (
+        int.parse(pick[0]),
+        pick.length > 1 ? int.tryParse(pick[1]) : null,
+        pick.length > 2 ? Suit.values.byName(pick[2]) : null,
+      );
+    }
+    // `force=1` shows the bid screen even in a Color round, which the game
+    // itself never does.
+    if (q['force'] == '1') {
+      c.dashPromptPending = false;
+      runApp(MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        home: Directionality(
+          textDirection: c.arabic ? TextDirection.rtl : TextDirection.ltr,
+          child: Scaffold(body: BidView(c: c)),
+        ),
+      ));
+      return;
+    }
     // `phase=calls` settles Omar's call (6 in hearts) and Karim's 3.
     if (q['phase'] == 'calls') {
       c.dashPromptPending = false;

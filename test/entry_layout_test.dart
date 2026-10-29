@@ -43,19 +43,21 @@ void main() {
       (t) async {
     final c = await pumpEntry(t, Screen.bid);
     expect(find.text('WHO WON THE BID?'), findsOneWidget);
+    expect(find.text('NORMAL ROUND · MIN 4'), findsOneWidget);
 
     // Nobody picked yet: the way on is held shut.
     await t.tap(find.text('CONTINUE TO CALLS'));
     await t.pumpAndSettle();
     expect(c.working.caller, isNull);
 
-    // Seat 0 won it for 7 in hearts. The bid opens on the minimum, and
-    // nothing reaches the round until the table moves on.
+    // Seat 0 won it for 7 in hearts. Nothing reaches the round until the
+    // table moves on.
     await t.tap(find.text('Karim'));
-    for (var i = 0; i < 3; i++) {
-      await t.tap(find.text('+'));
-      await t.pumpAndSettle();
-    }
+    await t.pumpAndSettle();
+    expect(find.text('PICK THE WINNING BID'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('bid7')));
+    await t.pumpAndSettle();
+    expect(find.text('PICK THE TRUMP'), findsOneWidget);
     await t.tap(find.text('♥'));
     await t.pumpAndSettle();
     expect(c.working.caller, isNull, reason: 'nothing lands before Continue');
@@ -96,7 +98,11 @@ void main() {
 
     await t.tap(find.text('Sara'));
     await t.pumpAndSettle();
-    await t.tap(find.text('−'));
+    // Under the minimum is struck out and takes nothing.
+    await t.tap(find.byKey(const ValueKey('bid3')));
+    await t.pumpAndSettle();
+    expect(find.text('PICK THE WINNING BID'), findsOneWidget);
+    await t.tap(find.byKey(ValueKey('bid${c.rules.minCallerBid}')));
     await t.pumpAndSettle();
     await t.tap(find.text('♠'));
     await t.pumpAndSettle();
@@ -111,6 +117,8 @@ void main() {
     final c = await pumpEntry(t, Screen.bid);
 
     await t.tap(find.text('Karim'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('bid5')));
     await t.tap(find.text('♠'));
     await t.pumpAndSettle();
     await t.tap(find.text('CONTINUE TO CALLS'));

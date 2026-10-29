@@ -823,7 +823,7 @@ class SeatPanel extends StatelessWidget {
     final inner = Padding(padding: padding, child: child);
     if (edge == PanelEdge.pending) {
       return CustomPaint(
-        painter: const _DashedEdge(),
+        painter: const DashedEdge(),
         child: DecoratedBox(
           decoration: BoxDecoration(color: Palette.panel, borderRadius: r),
           child: inner,
@@ -859,15 +859,24 @@ class SeatPanel extends StatelessWidget {
   }
 }
 
-class _DashedEdge extends CustomPainter {
-  const _DashedEdge();
+/// A dashed outline for something that is not there to be pressed, with an
+/// optional red stroke corner to corner when it is struck out.
+class DashedEdge extends CustomPainter {
+  final double radius;
+  final Color color;
+  final bool strike;
+  const DashedEdge({
+    this.radius = 18,
+    this.color = const Color(0x4DFFFFFF),
+    this.strike = false,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final rr = RRect.fromRectAndRadius(
-        (Offset.zero & size).deflate(0.75), const Radius.circular(18));
+        (Offset.zero & size).deflate(0.75), Radius.circular(radius));
     final paint = Paint()
-      ..color = const Color(0x4DFFFFFF)
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     for (final m in (Path()..addRRect(rr)).computeMetrics()) {
@@ -875,10 +884,22 @@ class _DashedEdge extends CustomPainter {
         canvas.drawPath(m.extractPath(d, math.min(d + 5, m.length)), paint);
       }
     }
+    if (strike) {
+      final inset = radius * 0.6;
+      canvas.drawLine(
+        Offset(inset, size.height - inset),
+        Offset(size.width - inset, inset),
+        Paint()
+          ..color = const Color(0x99FF6B5B)
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(_DashedEdge old) => false;
+  bool shouldRepaint(DashedEdge old) =>
+      old.radius != radius || old.color != color || old.strike != strike;
 }
 
 /// A titled section panel, as used for Settings' two columns.
